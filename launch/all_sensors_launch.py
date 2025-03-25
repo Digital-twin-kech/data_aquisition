@@ -1,4 +1,4 @@
-"""Launch file for all sensors (cameras and GNSS)."""
+"""Launch file for all sensors (cameras, GNSS, and LiDAR)."""
 
 from launch import LaunchDescription
 from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
@@ -34,6 +34,24 @@ def generate_launch_description():
         description='Use simulation time if true'
     )
     
+    use_lidar_arg = DeclareLaunchArgument(
+        'use_lidar',
+        default_value='true',
+        description='Launch LiDAR if true'
+    )
+    
+    use_lidar_adapter_arg = DeclareLaunchArgument(
+        'use_lidar_adapter',
+        default_value='true',
+        description='Use LiDAR adapter if true'
+    )
+    
+    use_rviz_arg = DeclareLaunchArgument(
+        'use_rviz',
+        default_value='false',
+        description='Launch RViz for visualization if true'
+    )
+    
     # Include camera launch file
     cameras_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/cameras_launch.py']),
@@ -52,12 +70,26 @@ def generate_launch_description():
         }.items()
     )
     
+    # Include LiDAR launch file
+    lidar_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/lidar_launch.py']),
+        launch_arguments={
+            'use_adapter': LaunchConfiguration('use_lidar_adapter'),
+            'use_rviz': LaunchConfiguration('use_rviz'),
+        }.items(),
+        condition=LaunchConfiguration('use_lidar')
+    )
+    
     # Return launch description
     return LaunchDescription([
         vehicle_speed_topic_arg,
         camera_model_arg,
         use_rtk_arg,
         use_sim_time_arg,
+        use_lidar_arg,
+        use_lidar_adapter_arg,
+        use_rviz_arg,
         cameras_launch,
         gnss_launch,
+        lidar_launch,
     ])

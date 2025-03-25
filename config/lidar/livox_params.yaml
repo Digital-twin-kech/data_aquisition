@@ -1,0 +1,22 @@
+/**:
+  ros__parameters:
+    lidar:
+      # Basic configuration
+      frame_id: "livox_frame"
+      ip_address: "192.168.1.100"
+      host_ip_address: "192.168.1.50"  # Updated to match current IP
+      use_dhcp: false
+      
+      # Network ports
+      data_port: 57000
+      command_port: 56000
+      imu_port: 58000
+      
+      # Lidar settings
+      broadcast_code: "livox0000000001"
+      publish_frequency: 10.0
+      point_cloud_type: 0  # 0=XYZ+Intensity, 1=XYZ+RGB
+      
+      # QoS settings
+      qos_reliability: true
+      qos_history_depth: 5

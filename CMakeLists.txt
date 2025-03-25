@@ -95,6 +95,41 @@ ament_target_dependencies(gnss_lib
   nav_msgs
 )
 
+# LiDAR components
+add_library(lidar_lib SHARED
+  src/lidar/lidar_config.cpp
+  src/lidar/lidar_driver.cpp
+  src/lidar/lidar_manager.cpp
+  src/lidar/livox_converter.cpp
+  src/lidar/livox_lidar_node.cpp
+)
+
+ament_target_dependencies(lidar_lib
+  rclcpp
+  rclcpp_components
+  rclcpp_lifecycle
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+  diagnostic_msgs
+  tf2
+  tf2_ros
+  lifecycle_msgs
+  diagnostic_updater
+)
+
+# LiDAR Adapter
+add_library(livox_adapter SHARED
+  src/lidar/livox_adapter_node.cpp
+  src/lidar/livox_converter.cpp
+)
+
+ament_target_dependencies(livox_adapter
+  rclcpp
+  rclcpp_components
+  std_msgs
+  sensor_msgs)
+
 # Camera node executable
 add_executable(zed_camera_node
   src/camera/zed_camera_main.cpp
@@ -126,16 +161,51 @@ ament_target_dependencies(gnss_node
   nav_msgs
 )
 
+# LiDAR node executable
+add_executable(livox_lidar_node
+  src/lidar/livox_lidar_main.cpp
+)
+
+target_link_libraries(livox_lidar_node lidar_lib)
+
+ament_target_dependencies(livox_lidar_node
+  rclcpp
+  rclcpp_components
+  rclcpp_lifecycle
+  std_msgs
+  sensor_msgs
+)
+
+# LiDAR adapter node executable
+add_executable(livox_adapter_node
+  src/lidar/livox_adapter_main.cpp
+)
+
+target_link_libraries(livox_adapter_node livox_adapter)
+
+ament_target_dependencies(livox_adapter_node
+  rclcpp
+  rclcpp_components
+  std_msgs
+  sensor_msgs
+)
+
 # Register components
 rclcpp_components_register_nodes(camera_lib "sensors::camera::ZedCameraNode")
 rclcpp_components_register_nodes(gnss_lib "sensors::gnss::GnssNode")
+rclcpp_components_register_nodes(lidar_lib "sensors::lidar::LivoxLidarNode")
+rclcpp_components_register_nodes(livox_adapter "sensors::lidar::LivoxAdapterNode")
 
 # Install targets
 install(TARGETS
   camera_lib
   gnss_lib
+  lidar_lib
+  livox_adapter
   zed_camera_node
   gnss_node
+  livox_lidar_node
+  livox_adapter_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
