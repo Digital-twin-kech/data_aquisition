@@ -1,0 +1,63 @@
+# ROS 2 build artifacts
+build/
+install/
+log/
+
+# Colcon workspace files
+.colcon_cd_root
+.colcon_workspace
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# C++ artifacts
+*.o
+*.so
+*.a
+*.la
+*.lo
+*.d
+*.gcda
+*.gcno
+*.gch
+*.pch
+*.obj
+*.dll
+*.exe
+*.lib
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build system outputs
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+CTestTestfile.cmake
+compile_commands.json
+
+# ROS bags
+*.bag
+*.bag.active
+
+# Custom project files
+*.SVO
+*.svo
+temp/
+tmp/
