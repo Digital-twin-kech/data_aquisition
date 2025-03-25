@@ -1,0 +1,25 @@
+/**:
+  ros__parameters:
+    # GNSS settings
+    gnss:
+      model: 'ublox-f9p'
+      serial_port: '/dev/ttyACM0'
+      baud_rate: 115200
+      frequency: 10.0
+      frame_id: 'gnss_frame'
+      
+      # RTK settings
+      use_rtcm_corrections: true
+      rtcm_source: 'NTRIP'
+      ntrip_server: 'caster.example.com:2101/RTCM3'
+      ntrip_username: 'username'  # Replace with your NTRIP username
+      ntrip_password: 'password'  # Replace with your NTRIP password
+      
+      # Dynamic model settings
+      use_dynamic_model: true
+      dynamic_model: 'automotive'  # Options: stationary, pedestrian, automotive, marine, airborne
+      
+      # QoS settings
+      qos:
+        reliability: 'reliable'
+        history_depth: 10

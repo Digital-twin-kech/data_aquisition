@@ -1,0 +1,38 @@
+/**:
+  ros__parameters:
+    # Camera settings
+    camera:
+      model: 'ZED_X'
+      min_fps: 15.0
+      max_fps: 60.0
+      reliable_qos: true
+      qos_history_depth: 5
+      pid_p: 0.8
+      pid_i: 0.2
+      pid_d: 0.05
+      
+    # Image quality and resolution
+    image:
+      resolution: 'HD720'  # Options: VGA, HD720, HD1080, HD2K
+      quality: 'QUALITY'   # Options: PERFORMANCE, QUALITY, ULTRA
+      
+    # Point cloud settings
+    point_cloud:
+      enabled: true
+      resolution: 'PERFORMANCE'  # Options: PERFORMANCE, QUALITY, ULTRA
+      max_range: 20.0  # meters
+      
+    # Depth settings
+    depth:
+      enabled: true
+      min_depth: 0.3  # meters
+      max_depth: 40.0  # meters
+      
+    # IMU settings
+    imu:
+      enabled: true
+      frequency: 200  # Hz
+      
+    # Positional tracking
+    tracking:
+      enabled: false  # Disable by default to save resources
