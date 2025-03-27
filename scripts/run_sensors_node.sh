@@ -125,12 +125,12 @@ fi
 # Source reference Livox implementation
 if [ "$RUN_LIDAR" = true ]; then
     echo -e "${YELLOW}[3/4] Sourcing reference Livox implementation...${NC}"
-    source /home/user/Desktop/instll_liv/ws_livox/install/setup.bash 2>/dev/null
+    source /opt/livox-sdk/install/setup.bash 2>/dev/null
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Reference Livox implementation sourced${NC}"
     else
         echo -e "${RED}✗ Failed to source reference Livox implementation${NC}"
-        echo -e "Expected at: /home/user/Desktop/instll_liv/ws_livox"
+        echo -e "Expected at: /opt/livox-sdk"
         echo -e "Would you like to continue without LiDAR? (y/n)"
         read -n 1 -r
         if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -292,15 +292,17 @@ if [ "$RUN_LIDAR" = true ]; then
         echo -e "${YELLOW}Will try to start LiDAR node anyway${NC}"
     fi
     
-    # Copy config file to reference path
-    CONFIG_DIR="/home/user/Desktop/instll_liv/ws_livox/src/livox_ros_driver2/config"
-    if [ -d "$CONFIG_DIR" ]; then
-        cp -f /home/user/Desktop/data-aquisition-digital-twin/data_aquisition/config/lidar/HAP_config.json "$CONFIG_DIR/"
-        echo -e "${GREEN}✓ Configuration file copied to reference path${NC}"
-    else
-        echo -e "${RED}✗ Reference config directory not found${NC}"
-        echo -e "${YELLOW}Will try to use default configuration${NC}"
-    fi
+    # Handle config file for LiDAR
+    CONFIG_DIR="/opt/livox-sdk/src/livox_ros_driver2/config"
+    CONFIG_SOURCE="/home/user/Desktop/data-aquisition-digital-twin/data_aquisition/config/lidar/HAP_config.json"
+    
+    # Always use a temporary config to avoid permission issues
+    echo -e "${YELLOW}Creating configuration in temporary location...${NC}"
+    TMP_CONFIG_DIR="/tmp/livox_config"
+    mkdir -p "$TMP_CONFIG_DIR"
+    cp -f "$CONFIG_SOURCE" "$TMP_CONFIG_DIR/HAP_config.json"
+    CONFIG_DIR="$TMP_CONFIG_DIR"
+    echo -e "${GREEN}✓ Configuration file copied to: $TMP_CONFIG_DIR${NC}"
     
     # Start the LiDAR driver
     echo -e "${YELLOW}Starting Livox LiDAR driver...${NC}"
@@ -318,6 +320,7 @@ if [ "$RUN_LIDAR" = true ]; then
     LIDAR_PID=$!
     ALL_PIDS+=($LIDAR_PID)
     echo -e "${GREEN}✓ LiDAR driver started with PID ${LIDAR_PID}${NC}"
+    echo -e "${CYAN}Using configuration file: ${CONFIG_DIR}/HAP_config.json${NC}"
     
     # Wait for LiDAR to initialize
     echo -e "${YELLOW}Waiting for LiDAR to initialize...${NC}"

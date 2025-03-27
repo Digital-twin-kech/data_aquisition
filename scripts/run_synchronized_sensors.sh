@@ -24,6 +24,8 @@ ALL_PIDS=()
 # Function to cleanup on exit
 cleanup() {
     echo -e "${YELLOW}Shutting down all processes...${NC}"
+    
+    # Kill all known PIDs first
     for pid in "${ALL_PIDS[@]}"; do
         if kill -0 $pid 2>/dev/null; then
             echo -e "Stopping process with PID $pid"
@@ -33,6 +35,28 @@ cleanup() {
             kill -9 $pid 2>/dev/null
         fi
     done
+    
+    # Clean up temporary files
+    if [[ -d "/tmp/livox_config" ]]; then
+        echo -e "${YELLOW}Cleaning up temporary config files...${NC}"
+        rm -rf /tmp/livox_config
+    fi
+    
+    # Find and kill any remaining ROS2 nodes that might be orphaned
+    echo -e "${YELLOW}Looking for orphaned ROS2 nodes...${NC}"
+    
+    # Get all ROS2 node process IDs
+    ROS_PIDS=$(ps -ef | grep "_ros2_node\|ros2 run\|ros2 launch" | grep -v grep | awk '{print $2}')
+    if [[ ! -z "$ROS_PIDS" ]]; then
+        echo -e "${YELLOW}Found orphaned ROS2 processes. Cleaning up...${NC}"
+        for ros_pid in $ROS_PIDS; do
+            echo -e "Stopping orphaned ROS2 process with PID $ros_pid"
+            kill -SIGINT $ros_pid 2>/dev/null
+            sleep 0.5
+            kill -9 $ros_pid 2>/dev/null
+        done
+    fi
+    
     echo -e "${GREEN}All processes stopped${NC}"
     exit 0
 }
@@ -117,28 +141,23 @@ else
     exit 1
 fi
 
-# Source reference Livox implementation
+# Source Livox implementation
 if [ "$RUN_LIDAR" = true ]; then
     echo -e "${YELLOW}[3/5] Sourcing Livox implementation...${NC}"
     source /opt/livox-sdk/install/setup.bash 2>/dev/null
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✓ Livox implementation sourced${NC}"
+        echo -e "${GREEN}✓ Livox implementation sourced from standard location${NC}"
     else
-        source /home/user/Desktop/instll_liv/ws_livox/install/setup.bash 2>/dev/null
-        if [ $? -eq 0 ]; then
-            echo -e "${YELLOW}⚠ Using temporary Livox SDK location${NC}"
-            echo -e "${YELLOW}⚠ Consider migrating to /opt/livox-sdk using migrate_livox_sdk.sh${NC}"
-        else
-            echo -e "${RED}✗ Failed to source Livox implementation${NC}"
-            echo -e "Would you like to continue without LiDAR? (y/n)"
-            read -n 1 -r
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                echo -e "Exiting."
-                exit 1
-            fi
-            echo
-            RUN_LIDAR=false
+        echo -e "${RED}✗ Failed to source Livox implementation${NC}"
+        echo -e "${YELLOW}Please run migrate_livox_sdk.sh to migrate the SDK to /opt/livox-sdk${NC}"
+        echo -e "Would you like to continue without LiDAR? (y/n)"
+        read -n 1 -r
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo -e "Exiting."
+            exit 1
         fi
+        echo
+        RUN_LIDAR=false
     fi
 fi
 
