@@ -16,6 +16,7 @@ NC='\033[0m' # No Color
 RUN_CAMERAS=true
 RUN_GNSS=true
 RUN_LIDAR=true
+RUN_SYNC=true
 LIDAR_IP="192.168.1.100"
 LOG_LEVEL="info"
 VERBOSE=false
@@ -23,7 +24,9 @@ ALL_PIDS=()
 
 # Function to cleanup on exit
 cleanup() {
-    echo -e "${YELLOW}Shutting down all sensor nodes...${NC}"
+    echo -e "${YELLOW}Shutting down all processes...${NC}"
+    
+    # Kill all known PIDs first
     for pid in "${ALL_PIDS[@]}"; do
         if kill -0 $pid 2>/dev/null; then
             echo -e "Stopping process with PID $pid"
@@ -33,7 +36,29 @@ cleanup() {
             kill -9 $pid 2>/dev/null
         fi
     done
-    echo -e "${GREEN}All sensor nodes stopped${NC}"
+    
+    # Clean up temporary files
+    if [[ -d "/tmp/livox_config" ]]; then
+        echo -e "${YELLOW}Cleaning up temporary config files...${NC}"
+        rm -rf /tmp/livox_config
+    fi
+    
+    # Find and kill any remaining ROS2 nodes that might be orphaned
+    echo -e "${YELLOW}Looking for orphaned ROS2 nodes...${NC}"
+    
+    # Get all ROS2 node process IDs
+    ROS_PIDS=$(ps -ef | grep "_ros2_node\|ros2 run\|ros2 launch" | grep -v grep | awk '{print $2}')
+    if [[ ! -z "$ROS_PIDS" ]]; then
+        echo -e "${YELLOW}Found orphaned ROS2 processes. Cleaning up...${NC}"
+        for ros_pid in $ROS_PIDS; do
+            echo -e "Stopping orphaned ROS2 process with PID $ros_pid"
+            kill -SIGINT $ros_pid 2>/dev/null
+            sleep 0.5
+            kill -9 $ros_pid 2>/dev/null
+        done
+    fi
+    
+    echo -e "${GREEN}All processes stopped${NC}"
     exit 0
 }
 
@@ -47,6 +72,7 @@ show_help() {
     echo "  --no-cameras         Don't run camera nodes"
     echo "  --no-gnss            Don't run GNSS node"
     echo "  --no-lidar           Don't run LiDAR node"
+    echo "  --no-sync            Don't run synchronization node"
     echo "  --lidar-ip IP        Set LiDAR IP address (default: 192.168.1.100)"
     echo "  --log-level LEVEL    Set log level (debug, info, warn, error) (default: info)"
     echo "  -v, --verbose        Enable verbose output"
@@ -66,6 +92,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-lidar)
             RUN_LIDAR=false
+            shift
+            ;;
+        --no-sync)
+            RUN_SYNC=false
             shift
             ;;
         --lidar-ip)
@@ -93,16 +123,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 echo -e "${BLUE}================================${NC}"
-echo -e "${BLUE}  SENSOR NODES LAUNCHER         ${NC}"
+echo -e "${BLUE}  SENSOR & SYNC NODES LAUNCHER  ${NC}"
 echo -e "${BLUE}================================${NC}"
 echo -e "${BLUE}Running cameras: ${NC}${RUN_CAMERAS}"
 echo -e "${BLUE}Running GNSS:    ${NC}${RUN_GNSS}"
 echo -e "${BLUE}Running LiDAR:   ${NC}${RUN_LIDAR} (IP: ${LIDAR_IP})"
+echo -e "${BLUE}Running sync:    ${NC}${RUN_SYNC}"
 echo -e "${BLUE}Log level:       ${NC}${LOG_LEVEL}"
 echo -e "${BLUE}================================${NC}"
 
 # Source ROS2
-echo -e "${YELLOW}[1/4] Sourcing ROS2 environment...${NC}"
+echo -e "${YELLOW}[1/5] Sourcing ROS2 environment...${NC}"
 source /opt/ros/humble/setup.bash
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ ROS2 environment sourced${NC}"
@@ -112,7 +143,7 @@ else
 fi
 
 # Source our implementation
-echo -e "${YELLOW}[2/4] Sourcing our implementation...${NC}"
+echo -e "${YELLOW}[2/5] Sourcing our implementation...${NC}"
 source /home/user/Desktop/data-aquisition-digital-twin/install/setup.bash 2>/dev/null
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Our implementation sourced${NC}"
@@ -122,9 +153,9 @@ else
     exit 1
 fi
 
-# Source reference Livox implementation
+# Source Livox implementation
 if [ "$RUN_LIDAR" = true ]; then
-    echo -e "${YELLOW}[3/4] Sourcing reference Livox implementation...${NC}"
+    echo -e "${YELLOW}[3/5] Sourcing Livox implementation...${NC}"
     source /opt/livox-sdk/install/setup.bash 2>/dev/null
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✓ Reference Livox implementation sourced${NC}"
@@ -144,7 +175,7 @@ fi
 
 # Create a log directory
 LOG_DIR="/tmp/sensor_logs"
-echo -e "${YELLOW}[4/4] Setting up log directory...${NC}"
+echo -e "${YELLOW}[4/5] Setting up log directory...${NC}"
 mkdir -p $LOG_DIR
 echo -e "${GREEN}✓ Log directory created: ${LOG_DIR}${NC}"
 
@@ -340,42 +371,95 @@ if [ "$RUN_LIDAR" = true ]; then
     fi
 fi
 
+# Launch Synchronization Node
+echo -e "${YELLOW}[5/5] Launching synchronization node...${NC}"
+if [ "$RUN_SYNC" = true ]; then
+    # Wait for sensors to initialize
+    echo -e "${CYAN}Waiting for sensors to initialize before starting sync...${NC}"
+    sleep 3
+    
+    # Start the sync node
+    echo -e "${MAGENTA}Starting synchronization node...${NC}"
+    ros2 run data_aquisition sync_node --ros-args \
+        -p camera_names:='["ZED_CAMERA_2i", "ZED_CAMERA_X0", "ZED_CAMERA_X1"]' \
+        -p sync_lidar:=$RUN_LIDAR \
+        -p sync_gnss:=$RUN_GNSS \
+        -p time_tolerance:=0.02 \
+        -p cache_size:=100 \
+        --log-level ${LOG_LEVEL} > ${LOG_DIR}/sync.log 2>&1 &
+    SYNC_PID=$!
+    ALL_PIDS+=($SYNC_PID)
+    echo -e "${GREEN}✓ Synchronization node started with PID ${SYNC_PID}${NC}"
+    
+    # Check if sync process is still running after a moment
+    sleep 2
+    if kill -0 $SYNC_PID 2>/dev/null; then
+        echo -e "${GREEN}✓ Synchronization node is running${NC}"
+    else
+        echo -e "${RED}✗ Synchronization node failed to start${NC}"
+        if [ "$VERBOSE" = true ]; then
+            echo -e "${YELLOW}Log output:${NC}"
+            tail -n 20 ${LOG_DIR}/sync.log
+        else
+            echo -e "${YELLOW}Use -v/--verbose to see log output${NC}"
+        fi
+    fi
+else
+    echo -e "${YELLOW}Synchronization node disabled${NC}"
+fi
+
 # Check all active topics
 echo -e "${BLUE}================================${NC}"
-echo -e "${GREEN}All requested sensor nodes started${NC}"
+echo -e "${GREEN}All requested nodes started${NC}"
 echo -e "${BLUE}================================${NC}"
 
-echo -e "${GREEN}Active sensors:${NC}"
+echo -e "${GREEN}Active components:${NC}"
 [ "$RUN_CAMERAS" = true ] && echo -e "  ${CYAN}● ZED Cameras${NC}"
 [ "$RUN_GNSS" = true ] && echo -e "  ${MAGENTA}● GNSS${NC}"
 [ "$RUN_LIDAR" = true ] && echo -e "  ${YELLOW}● LiDAR${NC}"
+[ "$RUN_SYNC" = true ] && echo -e "  ${WHITE}● Synchronization${NC}"
 
 # Display log directory
 echo -e "${BLUE}Logs are being saved to: ${LOG_DIR}${NC}"
 echo -e "  ${CYAN}● Camera logs: ${LOG_DIR}/camera_*.log${NC}"
 [ "$RUN_GNSS" = true ] && echo -e "  ${MAGENTA}● GNSS log: ${LOG_DIR}/gnss.log${NC}"
 [ "$RUN_LIDAR" = true ] && echo -e "  ${YELLOW}● LiDAR log: ${LOG_DIR}/lidar.log${NC}"
+[ "$RUN_SYNC" = true ] && echo -e "  ${WHITE}● Sync log: ${LOG_DIR}/sync.log${NC}"
 
 # Display active topics
 echo -e "${BLUE}Getting list of active topics...${NC}"
 sleep 2
 ros2 topic list | grep -E "/ZED_CAMERA|/gnss|/livox" | sort
 
+if [ "$RUN_SYNC" = true ]; then
+    echo -e "${GREEN}Synchronized topics:${NC}"
+    ros2 topic list | grep "/synchronized" | sort
+fi
+
 echo -e "${BLUE}================================${NC}"
-echo -e "${GREEN}All sensor nodes are running${NC}"
+echo -e "${GREEN}System is running${NC}"
 echo -e "${BLUE}To view logs in real-time, run in another terminal:${NC}"
 echo -e "${YELLOW}tail -f ${LOG_DIR}/*.log${NC}"
-echo -e "${BLUE}Press Ctrl+C to stop all sensor nodes${NC}"
+echo -e "${BLUE}Press Ctrl+C to stop all nodes${NC}"
 echo -e "${BLUE}================================${NC}"
 
 # Wait until user interrupts with Ctrl+C
 # This keeps the script running until user decides to stop
-echo -e "${GREEN}Monitoring sensors... (Press Ctrl+C to stop)${NC}"
+echo -e "${GREEN}Monitoring system... (Press Ctrl+C to stop)${NC}"
 
 # Periodically print status updates
 while true; do
-    sleep 10
-    echo -e "${GREEN}$(date +'%H:%M:%S')${NC} - All sensors running - $(ps -p $(echo ${ALL_PIDS[@]} | tr ' ' ',') -o comm= | sort | uniq | tr '\n' ' ')"
+    sleep 30
+    
+    # Count active topics
+    source_count=$(ros2 topic list | grep -E "/ZED_CAMERA|/gnss|/livox" | wc -l)
+    
+    if [ "$RUN_SYNC" = true ]; then
+        sync_count=$(ros2 topic list | grep "/synchronized" | wc -l)
+        echo -e "${GREEN}$(date +'%H:%M:%S')${NC} - System running - ${source_count} source topics, ${sync_count} synchronized topics"
+    else
+        echo -e "${GREEN}$(date +'%H:%M:%S')${NC} - System running - ${source_count} source topics"
+    fi
 done
 
 # The cleanup function will be called automatically by the trap handler when Ctrl+C is pressed
