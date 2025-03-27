@@ -19,6 +19,7 @@ find_package(tf2_ros REQUIRED)
 find_package(diagnostic_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(message_filters REQUIRED)
 
 # Find CUDA and ZED SDK
 find_package(CUDA REQUIRED)
@@ -42,10 +43,10 @@ include_directories(
 
 # Camera components
 add_library(camera_lib SHARED
-  src/camera/camera_config.cpp
-  src/camera/camera_manager.cpp
-  src/camera/zed_camera_driver.cpp
-  src/camera/zed_camera_node.cpp
+  src/sensors/camera/camera_config.cpp
+  src/sensors/camera/camera_manager.cpp 
+  src/sensors/camera/zed_camera_driver.cpp
+  src/sensors/camera/zed_camera_node.cpp
 )
 
 ament_target_dependencies(camera_lib
@@ -70,14 +71,14 @@ target_link_libraries(camera_lib
 
 # GNSS components
 add_library(gnss_lib SHARED
-  src/gnss/gnss_config.cpp
-  src/gnss/gnss_driver.cpp
-  src/gnss/gnss_node.cpp
-  src/gnss/gnss_manager.cpp
-  src/gnss/nmea_parser.cpp
-  src/gnss/base64.cpp
-  src/gnss/ntrip_client.cpp
-  src/gnss/rtk_processor.cpp
+  src/sensors/gnss/gnss_config.cpp
+  src/sensors/gnss/gnss_driver.cpp
+  src/sensors/gnss/gnss_node.cpp
+  src/sensors/gnss/gnss_manager.cpp
+  src/sensors/gnss/nmea_parser.cpp
+  src/sensors/gnss/base64.cpp
+  src/sensors/gnss/ntrip_client.cpp
+  src/sensors/gnss/rtk_processor.cpp
 )
 
 ament_target_dependencies(gnss_lib
@@ -97,11 +98,11 @@ ament_target_dependencies(gnss_lib
 
 # LiDAR components
 add_library(lidar_lib SHARED
-  src/lidar/lidar_config.cpp
-  src/lidar/lidar_driver.cpp
-  src/lidar/lidar_manager.cpp
-  src/lidar/livox_converter.cpp
-  src/lidar/livox_lidar_node.cpp
+  src/sensors/lidar/lidar_config.cpp
+  src/sensors/lidar/lidar_driver.cpp
+  src/sensors/lidar/lidar_manager.cpp
+  src/sensors/lidar/livox_converter.cpp
+  src/sensors/lidar/livox_lidar_node.cpp
 )
 
 ament_target_dependencies(lidar_lib
@@ -120,8 +121,8 @@ ament_target_dependencies(lidar_lib
 
 # LiDAR Adapter
 add_library(livox_adapter SHARED
-  src/lidar/livox_adapter_node.cpp
-  src/lidar/livox_converter.cpp
+  src/sensors/lidar/livox_adapter_node.cpp
+  src/sensors/lidar/livox_converter.cpp
 )
 
 ament_target_dependencies(livox_adapter
@@ -132,7 +133,7 @@ ament_target_dependencies(livox_adapter
 
 # Camera node executable
 add_executable(zed_camera_node
-  src/camera/zed_camera_main.cpp
+  src/sensors/camera/zed_camera_main.cpp
 )
 
 target_link_libraries(zed_camera_node camera_lib)
@@ -147,7 +148,7 @@ ament_target_dependencies(zed_camera_node
 
 # GNSS node executable
 add_executable(gnss_node
-  src/gnss/gnss_main.cpp
+  src/sensors/gnss/gnss_main.cpp
 )
 
 target_link_libraries(gnss_node gnss_lib)
@@ -163,7 +164,7 @@ ament_target_dependencies(gnss_node
 
 # LiDAR node executable
 add_executable(livox_lidar_node
-  src/lidar/livox_lidar_main.cpp
+  src/sensors/lidar/livox_lidar_main.cpp
 )
 
 target_link_libraries(livox_lidar_node lidar_lib)
@@ -178,7 +179,7 @@ ament_target_dependencies(livox_lidar_node
 
 # LiDAR adapter node executable
 add_executable(livox_adapter_node
-  src/lidar/livox_adapter_main.cpp
+  src/sensors/lidar/livox_adapter_main.cpp
 )
 
 target_link_libraries(livox_adapter_node livox_adapter)
@@ -190,11 +191,40 @@ ament_target_dependencies(livox_adapter_node
   sensor_msgs
 )
 
+# Sync components
+add_library(sync_lib SHARED
+  src/sync/sensor_synchronizer.cpp
+)
+
+ament_target_dependencies(sync_lib
+  rclcpp
+  rclcpp_components
+  std_msgs
+  sensor_msgs
+  message_filters
+)
+
+# Sync node executable
+add_executable(sync_node
+  src/sync/sync_main.cpp
+)
+
+target_link_libraries(sync_node sync_lib)
+
+ament_target_dependencies(sync_node
+  rclcpp
+  rclcpp_components
+  std_msgs
+  sensor_msgs
+  message_filters
+)
+
 # Register components
 rclcpp_components_register_nodes(camera_lib "sensors::camera::ZedCameraNode")
 rclcpp_components_register_nodes(gnss_lib "sensors::gnss::GnssNode")
 rclcpp_components_register_nodes(lidar_lib "sensors::lidar::LivoxLidarNode")
 rclcpp_components_register_nodes(livox_adapter "sensors::lidar::LivoxAdapterNode")
+rclcpp_components_register_nodes(sync_lib "data_aquisition::sync::SensorSynchronizer")
 
 # Install targets
 install(TARGETS
@@ -202,10 +232,12 @@ install(TARGETS
   gnss_lib
   lidar_lib
   livox_adapter
+  sync_lib
   zed_camera_node
   gnss_node
   livox_lidar_node
   livox_adapter_node
+  sync_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}

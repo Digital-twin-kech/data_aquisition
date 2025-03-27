@@ -31,6 +31,11 @@ private:
   std::vector<std::string> camera_names_;
   bool sync_lidar_;
   bool sync_gnss_;
+  std::string sync_policy_;
+  double time_tolerance_;
+  int cache_size_;
+  double max_delay_;
+  bool pass_through_; // Whether to directly forward messages without waiting for synchronization
   
   // Publishers
   std::unordered_map<std::string, rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr> sync_camera_rgb_pubs_;
@@ -39,12 +44,19 @@ private:
   rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr sync_lidar_pub_;
   rclcpp::Publisher<sensor_msgs::msg::NavSatFix>::SharedPtr sync_gnss_pub_;
   
-  // Message filter subscribers
+  // Message filter subscribers (for synchronized timestamps)
   std::unordered_map<std::string, message_filters::Subscriber<sensor_msgs::msg::Image>> camera_rgb_subs_;
   std::unordered_map<std::string, message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> camera_pc_subs_;
   std::unordered_map<std::string, message_filters::Subscriber<sensor_msgs::msg::Imu>> camera_imu_subs_;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>> lidar_sub_;
   std::unique_ptr<message_filters::Subscriber<sensor_msgs::msg::NavSatFix>> gnss_sub_;
+  
+  // Regular subscribers (for pass-through mode)
+  std::unordered_map<std::string, rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr> camera_rgb_direct_subs_;
+  std::unordered_map<std::string, rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr> camera_pc_direct_subs_;
+  std::unordered_map<std::string, rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr> camera_imu_direct_subs_;
+  rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr lidar_direct_sub_;
+  rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr gnss_direct_sub_;
   
   // Synchronizers for different sensor combinations
   using CameraSyncPolicy = message_filters::sync_policies::ApproximateTime<
@@ -59,6 +71,7 @@ private:
   void initializeSubscribers();
   void initializePublishers();
   void initializeSynchronizers();
+  void initializeDirectSubscribers();
   void loadParameters();
   
   // Sync callbacks
@@ -69,6 +82,20 @@ private:
   
   void lidarGnssSyncCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr& lidar_msg,
                            const sensor_msgs::msg::NavSatFix::ConstSharedPtr& gnss_msg);
+                           
+  // Direct pass-through callbacks - using standard ROS callback signature
+  void cameraRgbCallback(const std::string& camera_name,
+                       const sensor_msgs::msg::Image::ConstSharedPtr msg);
+  
+  void cameraPcCallback(const std::string& camera_name,
+                      const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  
+  void cameraImuCallback(const std::string& camera_name,
+                       const sensor_msgs::msg::Imu::ConstSharedPtr msg);
+  
+  void lidarCallback(const sensor_msgs::msg::PointCloud2::ConstSharedPtr msg);
+  
+  void gnssCallback(const sensor_msgs::msg::NavSatFix::ConstSharedPtr msg);
 };
 
 }  // namespace sync

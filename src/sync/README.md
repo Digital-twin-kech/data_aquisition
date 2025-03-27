@@ -11,6 +11,12 @@ The Sensor Synchronization module coordinates data from:
 
 It uses ROS2 message filters with configurable sync policies (exact time or approximate time) to create temporally aligned data streams.
 
+### QoS Settings
+- Input subscribers: Best-effort reliability with history depth matching the cache_size parameter
+- Output publishers: Reliable delivery with volatile durability and history depth matching the cache_size parameter
+
+This ensures the module can receive high-rate sensor data without requiring reliable delivery, while providing guaranteed message delivery to downstream nodes.
+
 ## Topics
 
 ### Input Topics:
@@ -36,13 +42,14 @@ It uses ROS2 message filters with configurable sync policies (exact time or appr
 
 ## Parameters
 
-- `sync_policy` (string) - Synchronization policy to use ("ExactTime", "ApproximateTime")
-- `time_tolerance` (double) - Time tolerance for synchronization (seconds)
-- `cache_size` (int) - Cache size for synchronization
-- `max_delay` (double) - Maximum allowable delay for synchronization (seconds)
-- `camera_names` (string[]) - List of camera names to synchronize
-- `sync_lidar` (bool) - Whether to synchronize LiDAR data
-- `sync_gnss` (bool) - Whether to synchronize GNSS data
+- `sync_policy` (string, default: "ApproximateTime") - Synchronization policy to use ("ExactTime", "ApproximateTime")
+- `time_tolerance` (double, default: 0.10) - Time tolerance for synchronization (seconds)
+- `cache_size` (int, default: 100) - Cache size for synchronization queue
+- `max_delay` (double, default: 0.5) - Maximum allowable delay for synchronization (seconds)
+- `camera_names` (string[], default: ["ZED_CAMERA_2i", "ZED_CAMERA_X0", "ZED_CAMERA_X1"]) - List of camera names to synchronize
+- `sync_lidar` (bool, default: true) - Whether to synchronize LiDAR data
+- `sync_gnss` (bool, default: true) - Whether to synchronize GNSS data
+- `pass_through` (bool, default: true) - Whether to directly forward sensor messages without waiting for synchronization
 
 ## Running the Node
 
@@ -53,7 +60,14 @@ ros2 launch data_aquisition sync_launch.py
 
 ### Running with Custom Parameters:
 ```bash
+# Use exact time policy with tight tolerance
 ros2 launch data_aquisition sync_launch.py sync_policy:=ExactTime time_tolerance:=0.01
+
+# Disable pass-through (only synchronized data will be published)
+ros2 launch data_aquisition sync_launch.py pass_through:=false
+
+# Increase time tolerance for sensors with large timestamp differences
+ros2 launch data_aquisition sync_launch.py time_tolerance:=0.20
 ```
 
 ## Monitoring Synchronization
@@ -72,8 +86,36 @@ The node publishes diagnostics and metrics:
 
 ## Common Issues
 
-1. **High Latency**: If the max_delay parameter is too low, messages might be dropped. Monitor the `/sync/metrics` topic and adjust as needed.
+1. **Empty Synchronized Topics**: If the synchronized topics are empty but the original sensor topics have data:
+   - Make sure `pass_through` parameter is set to `true` (default) to ensure data is always available
+   - Check for large timestamp differences between sensor messages and increase `time_tolerance`
+   - Verify that all required topics are being published
 
-2. **Missing Data**: Check that all source topics are publishing with the expected frequency.
+2. **High Latency**: If the max_delay parameter is too low, messages might be dropped. Monitor the ROS diagnostics and logs. You may need to increase the cache_size parameter if dealing with high-frequency data.
 
-3. **Poor Synchronization**: If timestamps between different sensors vary significantly, consider adjusting the time_tolerance parameter, or implementing a custom time synchronization strategy.
+3. **Missing Data**: Check that all source topics are publishing with the expected frequency. Use this command to check topic publishers:
+   ```bash
+   ros2 topic info /ZED_CAMERA_2i/rgb/image_rect_color
+   ```
+
+4. **Poor Synchronization**: If timestamps between different sensors vary significantly, consider:
+   - Increasing the time_tolerance parameter (e.g., to 0.20 seconds for better results)
+   - Checking for clock synchronization issues between devices
+   - Looking for excessive CPU load causing timing delays
+
+5. **QoS Mismatch**: If you're not receiving synchronized messages, verify that your QoS settings match:
+   ```bash
+   # Check a topic's QoS profile
+   ros2 topic info --verbose /livox/lidar
+   ```
+   The sync node subscribes using SensorDataQoS with best-effort reliability.
+
+6. **Choosing between Pass-through and Synchronized Mode**:
+   - Use pass-through (`pass_through:=true`) when you need to ensure all data is always available on synchronized topics
+   - Disable pass-through (`pass_through:=false`) when you need to ensure data is perfectly time-synchronized
+   - In applications where you need both, process the synchronized data when available but fall back to the most recent message otherwise
+
+7. **Debugging Sync Performance**: Enable debug logging to see timestamp differences between synchronized messages:
+   ```bash
+   ros2 launch data_aquisition sync_launch.py --log-level sensor_synchronizer:=debug
+   ```

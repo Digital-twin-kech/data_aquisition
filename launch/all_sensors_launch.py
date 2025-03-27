@@ -52,6 +52,24 @@ def generate_launch_description():
         description='Launch RViz for visualization if true'
     )
     
+    use_sync_arg = DeclareLaunchArgument(
+        'use_sync',
+        default_value='true',
+        description='Launch sensor synchronization node if true'
+    )
+    
+    sync_policy_arg = DeclareLaunchArgument(
+        'sync_policy',
+        default_value='ApproximateTime',
+        description='Synchronization policy (ExactTime or ApproximateTime)'
+    )
+    
+    time_tolerance_arg = DeclareLaunchArgument(
+        'time_tolerance',
+        default_value='0.02',
+        description='Time tolerance for synchronization in seconds'
+    )
+    
     # Include camera launch file
     cameras_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/cameras_launch.py']),
@@ -80,6 +98,16 @@ def generate_launch_description():
         condition=LaunchConfiguration('use_lidar')
     )
     
+    # Include sensor synchronization launch file
+    sync_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource([ThisLaunchFileDir(), '/sync_launch.py']),
+        launch_arguments={
+            'sync_policy': LaunchConfiguration('sync_policy'),
+            'time_tolerance': LaunchConfiguration('time_tolerance'),
+        }.items(),
+        condition=LaunchConfiguration('use_sync')
+    )
+    
     # Return launch description
     return LaunchDescription([
         vehicle_speed_topic_arg,
@@ -89,7 +117,11 @@ def generate_launch_description():
         use_lidar_arg,
         use_lidar_adapter_arg,
         use_rviz_arg,
+        use_sync_arg,
+        sync_policy_arg,
+        time_tolerance_arg,
         cameras_launch,
         gnss_launch,
         lidar_launch,
+        sync_launch,
     ])

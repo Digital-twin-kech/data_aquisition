@@ -13,7 +13,7 @@ def generate_launch_description():
     
     time_tolerance_arg = DeclareLaunchArgument(
         'time_tolerance',
-        default_value='0.02',
+        default_value='0.10',
         description='Time tolerance for synchronization in seconds'
     )
     
@@ -29,6 +29,12 @@ def generate_launch_description():
         description='Maximum allowable delay for synchronization in seconds'
     )
     
+    pass_through_arg = DeclareLaunchArgument(
+        'pass_through',
+        default_value='true',
+        description='Enable direct pass-through of messages without waiting for synchronization'
+    )
+    
     # Create sensor synchronizer node
     sync_node = Node(
         package='data_aquisition',
@@ -39,11 +45,15 @@ def generate_launch_description():
             'time_tolerance': LaunchConfiguration('time_tolerance'),
             'cache_size': LaunchConfiguration('cache_size'),
             'max_delay': LaunchConfiguration('max_delay'),
+            'pass_through': LaunchConfiguration('pass_through'),
             'camera_names': ['ZED_CAMERA_2i', 'ZED_CAMERA_X0', 'ZED_CAMERA_X1'],
             'sync_lidar': True,
             'sync_gnss': True
         }],
-        output='screen'
+        output='screen',
+        emulate_tty=True,  # To see colors in output
+        # Set log level to debug to see more detailed information
+        arguments=['--ros-args', '--log-level', 'sensor_synchronizer:=debug']
     )
     
     return LaunchDescription([
@@ -51,5 +61,6 @@ def generate_launch_description():
         time_tolerance_arg,
         cache_size_arg,
         max_delay_arg,
+        pass_through_arg,
         sync_node
     ])

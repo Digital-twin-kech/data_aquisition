@@ -14,15 +14,16 @@ data_aquisition/
 │       ├── gnss/                # GNSS interface headers
 │       └── lidar/               # LiDAR interface headers
 ├── src/                          # Source code
-│   ├── camera/                  # Camera implementation
-│   │   ├── README.md           # Camera subsystem documentation
-│   │   ├── ZED_CAMERA_GUIDE.md # ZED Camera specific guide
-│   │   ├── camera_config.cpp   # Camera configuration
-│   │   ├── camera_manager.cpp  # Camera management
-│   │   ├── zed_camera_driver.cpp # ZED camera driver
-│   │   └── zed_camera_node.cpp # ROS2 node for ZED cameras
-│   ├── gnss/                    # GNSS implementation
-│   └── lidar/                   # LiDAR implementation
+│   └── sensors/                 # Sensor implementations
+│       ├── camera/              # Camera implementation
+│       │   ├── README.md       # Camera subsystem documentation
+│       │   ├── ZED_CAMERA_GUIDE.md # ZED Camera specific guide
+│       │   ├── camera_config.cpp # Camera configuration
+│       │   ├── camera_manager.cpp # Camera management
+│       │   ├── zed_camera_driver.cpp # ZED camera driver
+│       │   └── zed_camera_node.cpp # ROS2 node for ZED cameras
+│       ├── gnss/                # GNSS implementation
+│       └── lidar/               # LiDAR implementation
 ├── scripts/                      # Utility scripts
 │   ├── camera/                  # Camera-specific scripts
 │   │   └── launch_all_cameras.sh # Script to launch multiple cameras
@@ -183,5 +184,6 @@ colcon build
 
 For more detailed information about specific subsystems, refer to the README files in each subdirectory:
 
-- `src/camera/README.md`: Camera subsystem documentation
-- `src/camera/ZED_CAMERA_GUIDE.md`: ZED Camera specific guide
+- `src/sensors/camera/README.md`: Camera subsystem documentation
+- `src/sensors/camera/ZED_CAMERA_GUIDE.md`: ZED Camera specific guide
+- `src/sensors/lidar/README.md`: LiDAR subsystem documentation

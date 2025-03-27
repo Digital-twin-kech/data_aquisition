@@ -24,7 +24,7 @@ The LiDAR uses the following default network configuration:
 
 1. **Livox SDK**: Required for communication with the LiDAR hardware
 2. **ROS2 Humble**: For integration with the rest of the system
-3. **Reference Implementation**: `/home/user/Desktop/instll_liv/ws_livox/`
+3. **Reference Implementation**: `/opt/livox-sdk/`
 
 ## Integration Approaches
 
@@ -177,7 +177,7 @@ For more control, you can run the LiDAR components manually:
 ```bash
 # Source ROS2 and reference implementation
 source /opt/ros/humble/setup.bash
-source /home/user/Desktop/instll_liv/ws_livox/install/setup.bash
+source /opt/livox-sdk/install/setup.bash
 
 # Run the LiDAR driver node
 ros2 run livox_ros_driver2 livox_ros_driver2_node \
@@ -244,7 +244,7 @@ The LiDAR subsystem publishes to the following topics:
 2. Verify JSON configuration:
    ```bash
    # Copy correct configuration
-   cp config/lidar/HAP_config.json /home/user/Desktop/instll_liv/ws_livox/src/livox_ros_driver2/config/
+   cp config/lidar/HAP_config.json /opt/livox-sdk/src/livox_ros_driver2/config/
    ```
 3. Restart the LiDAR driver:
    ```bash
