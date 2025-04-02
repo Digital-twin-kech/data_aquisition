@@ -20,6 +20,7 @@ find_package(diagnostic_msgs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(message_filters REQUIRED)
+find_package(Boost REQUIRED COMPONENTS system filesystem program_options)
 
 # Find CUDA and ZED SDK
 find_package(CUDA REQUIRED)
@@ -39,6 +40,7 @@ include_directories(
   ${NLOHMANN_JSON_INCLUDE_DIRS}
   ${ZED_INCLUDE_DIRS}
   ${CUDA_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
 )
 
 # Camera components
@@ -131,6 +133,26 @@ ament_target_dependencies(livox_adapter
   std_msgs
   sensor_msgs)
 
+# ROS2 Bag Recorder components
+add_library(recording_lib SHARED
+  src/recording/rosbag_recorder.cpp
+)
+
+ament_target_dependencies(recording_lib
+  rclcpp
+  rclcpp_components
+  rclcpp_lifecycle
+  std_msgs
+  sensor_msgs
+  diagnostic_msgs
+  lifecycle_msgs
+  diagnostic_updater
+)
+
+target_link_libraries(recording_lib
+  ${Boost_LIBRARIES}
+)
+
 # Camera node executable
 add_executable(zed_camera_node
   src/sensors/camera/zed_camera_main.cpp
@@ -219,12 +241,28 @@ ament_target_dependencies(sync_node
   message_filters
 )
 
+# ROS2 Bag Recorder node executable
+add_executable(rosbag_recorder_node
+  src/recording/rosbag_recorder_main.cpp
+)
+
+target_link_libraries(rosbag_recorder_node recording_lib)
+
+ament_target_dependencies(rosbag_recorder_node
+  rclcpp
+  rclcpp_components
+  rclcpp_lifecycle
+  std_msgs
+  sensor_msgs
+)
+
 # Register components
 rclcpp_components_register_nodes(camera_lib "sensors::camera::ZedCameraNode")
 rclcpp_components_register_nodes(gnss_lib "sensors::gnss::GnssNode")
 rclcpp_components_register_nodes(lidar_lib "sensors::lidar::LivoxLidarNode")
 rclcpp_components_register_nodes(livox_adapter "sensors::lidar::LivoxAdapterNode")
 rclcpp_components_register_nodes(sync_lib "data_aquisition::sync::SensorSynchronizer")
+rclcpp_components_register_nodes(recording_lib "data_aquisition::recording::RosbagRecorder")
 
 # Install targets
 install(TARGETS
@@ -233,11 +271,13 @@ install(TARGETS
   lidar_lib
   livox_adapter
   sync_lib
+  recording_lib
   zed_camera_node
   gnss_node
   livox_lidar_node
   livox_adapter_node
   sync_node
+  rosbag_recorder_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
@@ -262,6 +302,11 @@ install(DIRECTORY config/
 install(DIRECTORY scripts/
   DESTINATION lib/${PROJECT_NAME}
   USE_SOURCE_PERMISSIONS
+)
+
+# Ensure scripts are executable
+execute_process(
+  COMMAND chmod +x ${CMAKE_CURRENT_SOURCE_DIR}/scripts/recording/run_synchronized_recording.sh
 )
 
 ament_package()

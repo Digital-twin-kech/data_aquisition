@@ -112,6 +112,31 @@ def generate_launch_description():
         ]
     )
     
+    # Static transform publishers for camera frames
+    zed_2i_tf_publisher = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='zed_2i_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'zed_2i_camera_link'],
+        output='screen'
+    )
+    
+    zed_x0_tf_publisher = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='zed_x0_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'zed_x0_camera_link'],
+        output='screen'
+    )
+    
+    zed_x1_tf_publisher = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='zed_x1_tf',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'zed_x1_camera_link'],
+        output='screen'
+    )
+    
     # Optional RViz node for visualization
     rviz_node = Node(
         package='rviz2',
@@ -133,6 +158,9 @@ def generate_launch_description():
         zed_usb_camera_node,
         zed_gmsl0_camera_node,
         zed_gmsl1_camera_node,
+        zed_2i_tf_publisher,
+        zed_x0_tf_publisher,
+        zed_x1_tf_publisher,
         # Comment out RViz node if not needed
         # rviz_node,
     ])

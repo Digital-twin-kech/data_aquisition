@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Script to visualize ZED camera point clouds with proper TF setup
-# This is a standalone script that doesn't require sensors to be running
+# Script to visualize Livox LiDAR point clouds with proper TF setup
+# This is a standalone script that doesn't require sensors to be running previously
 
 # Colors for output
 GREEN='\033[0;32m'
@@ -10,17 +10,12 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Default values
-CAMERA_NAME="ZED_CAMERA_X0"
 TOPIC_TYPE="synchronized" # or "raw"
 POINT_SIZE=2
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --camera)
-            CAMERA_NAME="$2"
-            shift 2
-            ;;
         --topic-type)
             TOPIC_TYPE="$2"
             shift 2
@@ -31,7 +26,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Usage: $0 [--camera CAMERA_NAME] [--topic-type raw|synchronized] [--point-size SIZE]"
+            echo "Usage: $0 [--topic-type raw|synchronized] [--point-size SIZE]"
             exit 1
             ;;
     esac
@@ -39,26 +34,17 @@ done
 
 # Construct topic path based on topic type
 if [ "$TOPIC_TYPE" == "synchronized" ]; then
-    TOPIC="/${TOPIC_TYPE}/${CAMERA_NAME}/point_cloud/cloud_registered"
+    TOPIC="/${TOPIC_TYPE}/livox/lidar"
 else
-    TOPIC="/${CAMERA_NAME}/point_cloud/cloud_registered"
+    TOPIC="/livox/lidar"
 fi
 
-# Extract the frame ID from the camera name
-if [[ "$CAMERA_NAME" == "ZED_CAMERA_X0" ]]; then
-    FRAME_ID="zed_x0_camera_link"
-elif [[ "$CAMERA_NAME" == "ZED_CAMERA_X1" ]]; then
-    FRAME_ID="zed_x1_camera_link"
-elif [[ "$CAMERA_NAME" == "ZED_CAMERA_2i" ]]; then
-    FRAME_ID="zed_2i_camera_link"
-else
-    FRAME_ID="camera_link"
-fi
+# Frame ID is always livox_frame
+FRAME_ID="livox_frame"
 
 echo -e "${BLUE}================================${NC}"
-echo -e "${GREEN}Point Cloud Visualizer${NC}"
+echo -e "${GREEN}Livox LiDAR Point Cloud Visualizer${NC}"
 echo -e "${BLUE}================================${NC}"
-echo -e "${GREEN}Camera:${NC} $CAMERA_NAME"
 echo -e "${GREEN}Topic:${NC} $TOPIC"
 echo -e "${GREEN}Frame:${NC} $FRAME_ID"
 echo -e "${BLUE}================================${NC}"
@@ -70,13 +56,13 @@ if [ -z "$ROS_DISTRO" ]; then
     source /home/user/Desktop/data-aquisition-digital-twin/install/setup.bash
 fi
 
-# Start TF publisher to connect camera frame to map
+# Start TF publisher to connect lidar frame to map
 echo -e "${YELLOW}Publishing TF transform...${NC}"
 ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id "$FRAME_ID" &
 TF_PID=$!
 
-# Create a temporary RViz configuration optimized for this camera's point cloud
-TEMP_RVIZ_CONFIG="/tmp/${CAMERA_NAME}_pointcloud_viewer.rviz"
+# Create a temporary RViz configuration optimized for LiDAR point cloud
+TEMP_RVIZ_CONFIG="/tmp/livox_pointcloud_viewer.rviz"
 cat > "$TEMP_RVIZ_CONFIG" << EOF
 Panels:
   - Class: rviz_common/Displays
@@ -116,15 +102,15 @@ Visualization Manager:
         Min Value: -10
         Value: true
       Axis: Z
-      Channel Name: rgb
+      Channel Name: intensity
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 255
-      Color Transformer: RGB8
+      Color Transformer: Intensity
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 4096
+      Max Intensity: 255
       Min Color: 0; 0; 0
       Min Intensity: 0
       Name: PointCloud2
