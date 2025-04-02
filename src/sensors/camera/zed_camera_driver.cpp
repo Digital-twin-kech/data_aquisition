@@ -500,14 +500,8 @@ bool ZedCameraDriver::getPointCloud(sensor_msgs::msg::PointCloud2& cloud) {
   }
   
   try {
-    // Grab again to ensure we have fresh data - this is needed for real hardware
-    sl::ERROR_CODE grab_err = zed_->grab(runtime_params_);
-    if (grab_err != sl::ERROR_CODE::SUCCESS) {
-      if (grab_err != sl::ERROR_CODE::CAMERA_NOT_DETECTED) {
-        std::cerr << "Error grabbing frame for point cloud: " << sl::toString(grab_err) << std::endl;
-      }
-      return false;
-    }
+    // Note: No need to grab again - the camera manager already ensures fresh data by calling grab
+    // Using the current frame data for better efficiency
     
     // Retrieve the point cloud with ULTRA depth resolution
     sl::Mat zed_cloud;
@@ -535,11 +529,22 @@ bool ZedCameraDriver::getPointCloud(sensor_msgs::msg::PointCloud2& cloud) {
     
     // Fill the ROS2 point cloud message
     cloud.header.stamp = rclcpp::Clock().now();
-    // Use the camera's frame_id without _frame suffix for better TF compatibility
-    cloud.header.frame_id = "camera_link"; // Use a fixed frame name that RViz knows
     
-    // For better visualization, downsample the point cloud more aggressively
-    int downsample_factor = 4; // Use 4 for quarter resolution to reduce message size
+    // Use camera-specific frame IDs for better compatibility
+    std::string ns = config_->getNamespace();
+    if (ns == "ZED_CAMERA_X0") {
+        cloud.header.frame_id = "zed_camera_left"; // Default name for the main camera
+    } else if (ns == "ZED_CAMERA_X1") {
+        cloud.header.frame_id = "zed_camera_left_x1"; // Custom name for X1
+    } else if (ns == "ZED_CAMERA_2i") {
+        cloud.header.frame_id = "zed_camera_left_2i"; // Custom name for 2i
+    } else {
+        // Fallback to standard name
+        cloud.header.frame_id = "zed_camera_left";
+    }
+    
+    // For better visualization, downsample the point cloud but keep enough detail for proper visualization
+    int downsample_factor = 2; // Use 2 for half resolution for better quality while keeping message size manageable
     cloud.height = zed_cloud.getHeight() / downsample_factor;
     cloud.width = zed_cloud.getWidth() / downsample_factor;
     cloud.is_dense = true; // Set to true for better compatibility with RViz
@@ -568,11 +573,10 @@ bool ZedCameraDriver::getPointCloud(sensor_msgs::msg::PointCloud2& cloud) {
     field_z.datatype = sensor_msgs::msg::PointField::FLOAT32;
     field_z.count = 1;
     
-    // Important: The field name must be "rgb" for PCL compatibility
-    // Important: Use specific PCL-compatible field names
+    // CRITICAL: The field name must be "rgb" for PCL/RViz compatibility
     field_rgb.name = "rgb";
     field_rgb.offset = 12;
-    field_rgb.datatype = sensor_msgs::msg::PointField::FLOAT32; // Use FLOAT32 instead of UINT32 for better PCL compatibility
+    field_rgb.datatype = sensor_msgs::msg::PointField::UINT32; // Must be UINT32 for RGB
     field_rgb.count = 1;
     
     cloud.fields = {field_x, field_y, field_z, field_rgb};
@@ -612,10 +616,9 @@ bool ZedCameraDriver::getPointCloud(sensor_msgs::msg::PointCloud2& cloud) {
         // Get the point from the original cloud
         sl::float4 point = src_ptr[src_idx];
         
-        // Check if the point is valid (not NaN and not too far)
+        // Check if the point is valid (not NaN) - relaxed filtering to include more points
         if (!std::isnan(point.x) && !std::isnan(point.y) && !std::isnan(point.z) && 
-            std::abs(point.x) > 1e-5f && std::abs(point.y) > 1e-5f && std::abs(point.z) > 1e-5f &&
-            std::abs(point.z) < 10.0f) { // Only include points within 10 meters for better visibility
+            std::abs(point.z) < 20.0f) { // Include points up to 20 meters for better visualization
           
           // PCL expects a different memory layout for RGB
           // Swap from RGBA to BGRA (PCL expects a certain memory layout)
@@ -625,8 +628,9 @@ bool ZedCameraDriver::getPointCloud(sensor_msgs::msg::PointCloud2& cloud) {
           uint8_t b = rgba[2];
           uint8_t a = rgba[3];
           
-          // Create RGB in PCL's expected format (RGB float value as BGRA)
-          uint32_t rgb_val = ((uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b);
+          // Create RGB in PCL's expected format (BGR format where B is in the highest bits)
+          // PCL expects BGR ordering, not RGB
+          uint32_t rgb_val = ((uint32_t)b << 16 | (uint32_t)g << 8 | (uint32_t)r);
           
           // Create a temporary buffer for this point
           uint8_t point_data[point_step];

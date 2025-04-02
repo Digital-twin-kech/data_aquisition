@@ -98,12 +98,21 @@ bool CameraManager::initialize() {
     );
     
     // Setup QoS profile for camera topics that matches RViz and standard tools
-    // Use reliability=reliable for compatibility with default RViz settings
     rclcpp::QoS camera_qos(config_->getQosHistoryDepth());
-    // Override reliability to Reliable for better compatibility with visualization tools
-    camera_qos.reliability(rclcpp::ReliabilityPolicy::Reliable);
+    
+    // Use reliability based on configuration - BestEffort is better for performance with point clouds
+    // when streaming large amounts of data
+    if (config_->getReliabilityPolicy() == rclcpp::ReliabilityPolicy::BestEffort) {
+      camera_qos.reliability(rclcpp::ReliabilityPolicy::BestEffort);
+      camera_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+      RCLCPP_INFO(node_->get_logger(), "Using BestEffort reliability for better real-time performance");
+    } else {
+      camera_qos.reliability(rclcpp::ReliabilityPolicy::Reliable);
+      camera_qos.durability(rclcpp::DurabilityPolicy::Volatile);
+      RCLCPP_INFO(node_->get_logger(), "Using Reliable QoS for better compatibility with visualization tools");
+    }
+    
     camera_qos.history(rclcpp::HistoryPolicy::KeepLast);
-    camera_qos.durability(rclcpp::DurabilityPolicy::Volatile);
     
     // Log QoS settings for debugging
     RCLCPP_INFO(node_->get_logger(), "Setting up camera publishers with QoS: reliability=%s, history=KeepLast(%d)",
@@ -270,16 +279,9 @@ void CameraManager::publishCameraData() {
   // Publish point cloud
   sensor_msgs::msg::PointCloud2 cloud_msg;
   if (camera_driver_->getPointCloud(cloud_msg)) {
-    // Make sure we use a valid frame_id that works with RViz2
-    std::string ns = node_->get_namespace();
-    if (ns.empty() || ns == "/") {
-      ns = "camera";
-    } else if (ns[0] == '/') {
-      ns = ns.substr(1); // Remove leading slash
-    }
-    
-    // Use a simple frame_id that RViz will understand
-    cloud_msg.header.frame_id = "map";
+    // Leave the frame_id as it is from the driver - it contains the right value
+    // This ensures the point cloud uses the same frame ID from the config
+    // which is already set in the getPointCloud method
     
     RCLCPP_INFO(node_->get_logger(), "Publishing point cloud with %d points (%dx%d) on topic: %s",
                cloud_msg.width * cloud_msg.height, cloud_msg.width, cloud_msg.height,

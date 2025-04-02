@@ -1,0 +1,5 @@
+sensors::camera::ZedCameraNode;lib/libcamera_lib.so
+sensors::gnss::GnssNode;lib/libgnss_lib.so
+sensors::lidar::LivoxLidarNode;lib/liblidar_lib.so
+sensors::lidar::LivoxAdapterNode;lib/liblivox_adapter.so
+data_aquisition::sync::SensorSynchronizer;lib/libsync_lib.so

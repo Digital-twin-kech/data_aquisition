@@ -10,6 +10,7 @@
       pid_p: 0.8
       pid_i: 0.2
       pid_d: 0.05
+      frame_id: 'camera_link'
       
     # Image quality and resolution
     image:
@@ -21,6 +22,7 @@
       enabled: true
       resolution: 'PERFORMANCE'  # Options: PERFORMANCE, QUALITY, ULTRA
       max_range: 20.0  # meters
+      frame_id: 'camera_link'
       
     # Depth settings
     depth:

@@ -113,7 +113,7 @@ public:
     // Use the namespace as the frame ID base
     std::string ns = node_->get_namespace();
     if (ns.empty() || ns == "/") {
-      return "zed_camera_" + camera_model_;
+      return "camera_link";
     }
     
     // Remove leading slash if present
@@ -121,7 +121,64 @@ public:
       ns = ns.substr(1);
     }
     
-    return ns + "_frame";
+    // For ZED cameras, use the standard ZED SDK frame naming convention
+    // This matches what ZED ROS2 wrapper and RViz2 expect
+    std::string cam_name;
+    
+    if (ns == "ZED_CAMERA_X0") {
+      cam_name = "zed_x0";
+    } else if (ns == "ZED_CAMERA_X1") {
+      cam_name = "zed_x1";
+    } else if (ns == "ZED_CAMERA_2i") {
+      cam_name = "zed_2i";
+    } else {
+      cam_name = ns;
+    }
+    
+    // Return standard ZED SDK frame ID (left camera frame)
+    return cam_name + "_left_camera_frame";
+  }
+  
+  std::string getNamespace() const {
+    // Get the node's namespace
+    std::string ns = node_->get_namespace();
+    
+    // Remove leading slash if present
+    if (!ns.empty() && ns[0] == '/') {
+      ns = ns.substr(1);
+    }
+    
+    // If empty, return a default value
+    if (ns.empty() || ns == "/") {
+      return "DEFAULT";
+    }
+    
+    return ns;
+  }
+  
+  std::string getPointCloudFrameId() const {
+    // Use the namespace as the frame ID base
+    std::string ns = getNamespace();
+    if (ns == "DEFAULT") {
+      return "camera_link";
+    }
+    
+    // For ZED cameras, use the standard ZED SDK frame naming convention
+    // This matches what ZED ROS2 wrapper and RViz2 expect for point clouds
+    std::string cam_name;
+    
+    if (ns == "ZED_CAMERA_X0") {
+      cam_name = "zed_x0";
+    } else if (ns == "ZED_CAMERA_X1") {
+      cam_name = "zed_x1";
+    } else if (ns == "ZED_CAMERA_2i") {
+      cam_name = "zed_2i";
+    } else {
+      cam_name = ns;
+    }
+    
+    // Return standard ZED SDK frame ID for point clouds (left camera optical frame)
+    return cam_name + "_left_camera_optical_frame";
   }
 
 private:

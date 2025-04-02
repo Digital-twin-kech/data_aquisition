@@ -199,6 +199,10 @@ if [ "$RUN_CAMERAS" = true ]; then
         -p camera.resolution:=HD720 \
         -p camera.min_fps:=15.0 \
         -p camera.max_fps:=15.0 \
+        -p camera.reliable_qos:=false \
+        -p depth.enabled:=true \
+        -p point_cloud.enabled:=true \
+        -p point_cloud.max_range:=20.0 \
         --log-level ${LOG_LEVEL} > ${LOG_DIR}/camera_x0.log 2>&1 &
     CAMERA_X0_PID=$!
     ALL_PIDS+=($CAMERA_X0_PID)
@@ -215,6 +219,10 @@ if [ "$RUN_CAMERAS" = true ]; then
         -p camera.resolution:=HD720 \
         -p camera.min_fps:=15.0 \
         -p camera.max_fps:=15.0 \
+        -p camera.reliable_qos:=false \
+        -p depth.enabled:=true \
+        -p point_cloud.enabled:=true \
+        -p point_cloud.max_range:=20.0 \
         --log-level ${LOG_LEVEL} > ${LOG_DIR}/camera_x1.log 2>&1 &
     CAMERA_X1_PID=$!
     ALL_PIDS+=($CAMERA_X1_PID)
@@ -231,6 +239,10 @@ if [ "$RUN_CAMERAS" = true ]; then
         -p camera.resolution:=HD720 \
         -p camera.min_fps:=15.0 \
         -p camera.max_fps:=15.0 \
+        -p camera.reliable_qos:=false \
+        -p depth.enabled:=true \
+        -p point_cloud.enabled:=true \
+        -p point_cloud.max_range:=20.0 \
         --log-level ${LOG_LEVEL} > ${LOG_DIR}/camera_2i.log 2>&1 &
     CAMERA_2I_PID=$!
     ALL_PIDS+=($CAMERA_2I_PID)
@@ -378,14 +390,15 @@ if [ "$RUN_SYNC" = true ]; then
     echo -e "${CYAN}Waiting for sensors to initialize before starting sync...${NC}"
     sleep 3
     
-    # Start the sync node
+    # Start the sync node with larger time tolerance
     echo -e "${MAGENTA}Starting synchronization node...${NC}"
     ros2 run data_aquisition sync_node --ros-args \
         -p camera_names:='["ZED_CAMERA_2i", "ZED_CAMERA_X0", "ZED_CAMERA_X1"]' \
         -p sync_lidar:=$RUN_LIDAR \
         -p sync_gnss:=$RUN_GNSS \
-        -p time_tolerance:=0.02 \
+        -p time_tolerance:=0.1 \
         -p cache_size:=100 \
+        -p pass_through:=true \
         --log-level ${LOG_LEVEL} > ${LOG_DIR}/sync.log 2>&1 &
     SYNC_PID=$!
     ALL_PIDS+=($SYNC_PID)
@@ -409,6 +422,93 @@ else
 fi
 
 # Check all active topics
+# Add TF2 static transform publishers for all sensor frames
+echo -e "${BLUE}================================${NC}"
+echo -e "${CYAN}Setting up TF transforms for visualization...${NC}"
+echo -e "${BLUE}================================${NC}"
+
+# Publish transforms for all sensors to map frame
+# ZED cameras - using offsets to visualize them separately in space
+# Generic camera_link frame
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id camera_link > ${LOG_DIR}/tf_cam_link.log 2>&1 &
+TF_CAM_LINK_PID=$!
+ALL_PIDS+=($TF_CAM_LINK_PID)
+
+# ZED 2i camera frames with offset to see them separately
+# Main camera frame (zed_2i_left_camera_frame)
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0.5 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_2i_left_camera_frame > ${LOG_DIR}/tf_zed_2i.log 2>&1 &
+TF_ZED_2I_PID=$!
+ALL_PIDS+=($TF_ZED_2I_PID)
+
+# Direct map to legacy frame for ZED 2i (with unique offset)
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0.5 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_camera_left_2i > ${LOG_DIR}/tf_zed_2i_compat.log 2>&1 &
+TF_ZED_2I_COMPAT_PID=$!
+ALL_PIDS+=($TF_ZED_2I_COMPAT_PID)
+
+# Add optical frame for compatibility
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_camera_left_2i --child-frame-id zed_camera_left_2i_optical_frame > ${LOG_DIR}/tf_zed_2i_compat_opt.log 2>&1 &
+TF_ZED_2I_COMPAT_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_2I_COMPAT_OPT_PID)
+
+# Optional camera frame to optical frame for point clouds
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_2i_left_camera_frame --child-frame-id zed_2i_left_camera_optical_frame > ${LOG_DIR}/tf_zed_2i_optical.log 2>&1 &
+TF_ZED_2I_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_2I_OPT_PID)
+
+# ZED X0 camera frames with offset
+# Main camera frame (zed_x0_left_camera_frame)
+ros2 run tf2_ros static_transform_publisher --x 0 --y -0.5 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_x0_left_camera_frame > ${LOG_DIR}/tf_zed_x0.log 2>&1 &
+TF_ZED_X0_PID=$!
+ALL_PIDS+=($TF_ZED_X0_PID)
+
+# Direct map to 'zed_camera_left' frame that RViz expects
+ros2 run tf2_ros static_transform_publisher --x 0 --y -0.5 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_camera_left > ${LOG_DIR}/tf_zed_compat.log 2>&1 &
+TF_ZED_COMPAT_PID=$!
+ALL_PIDS+=($TF_ZED_COMPAT_PID)
+
+# Add optical frame for compatibility
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_camera_left --child-frame-id zed_camera_left_optical_frame > ${LOG_DIR}/tf_zed_compat_opt.log 2>&1 &
+TF_ZED_COMPAT_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_COMPAT_OPT_PID)
+
+# Optional camera frame to optical frame for point clouds
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_x0_left_camera_frame --child-frame-id zed_x0_left_camera_optical_frame > ${LOG_DIR}/tf_zed_x0_optical.log 2>&1 &
+TF_ZED_X0_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_X0_OPT_PID)
+
+# ZED X1 camera frames with offset
+# Main camera frame (zed_x1_left_camera_frame)
+ros2 run tf2_ros static_transform_publisher --x 0.5 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_x1_left_camera_frame > ${LOG_DIR}/tf_zed_x1.log 2>&1 &
+TF_ZED_X1_PID=$!
+ALL_PIDS+=($TF_ZED_X1_PID)
+
+# Direct map to legacy frame for ZED X1 (with unique offset)
+ros2 run tf2_ros static_transform_publisher --x 0.5 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id zed_camera_left_x1 > ${LOG_DIR}/tf_zed_x1_compat.log 2>&1 &
+TF_ZED_X1_COMPAT_PID=$!
+ALL_PIDS+=($TF_ZED_X1_COMPAT_PID)
+
+# Add optical frame for compatibility
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_camera_left_x1 --child-frame-id zed_camera_left_x1_optical_frame > ${LOG_DIR}/tf_zed_x1_compat_opt.log 2>&1 &
+TF_ZED_X1_COMPAT_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_X1_COMPAT_OPT_PID)
+
+# Optional camera frame to optical frame for point clouds
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx -0.5 --qy 0.5 --qz -0.5 --qw 0.5 --frame-id zed_x1_left_camera_frame --child-frame-id zed_x1_left_camera_optical_frame > ${LOG_DIR}/tf_zed_x1_optical.log 2>&1 &
+TF_ZED_X1_OPT_PID=$!
+ALL_PIDS+=($TF_ZED_X1_OPT_PID)
+
+# LiDAR
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id livox_frame > ${LOG_DIR}/tf_livox.log 2>&1 &
+TF_LIVOX_PID=$!
+ALL_PIDS+=($TF_LIVOX_PID)
+
+# GNSS
+ros2 run tf2_ros static_transform_publisher --x 0 --y 0 --z 0 --qx 0 --qy 0 --qz 0 --qw 1 --frame-id map --child-frame-id gnss_frame > ${LOG_DIR}/tf_gnss.log 2>&1 &
+TF_GNSS_PID=$!
+ALL_PIDS+=($TF_GNSS_PID)
+
+echo -e "${GREEN}✓ TF transforms published${NC}"
+
 echo -e "${BLUE}================================${NC}"
 echo -e "${GREEN}All requested nodes started${NC}"
 echo -e "${BLUE}================================${NC}"
