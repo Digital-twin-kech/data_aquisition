@@ -21,14 +21,13 @@ def generate_launch_description():
         }.items()
     )
     
-    # Include rosbag recorder launch file
-    rosbag_recorder_launch = IncludeLaunchDescription(
+    # Include data recorder launch file 
+    data_recorder_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(package_dir, 'launch', 'rosbag_recorder_launch.py')
+            os.path.join(package_dir, 'launch', 'data_recorder_only_launch.py')
         ),
         launch_arguments={
-            'output_directory': LaunchConfiguration('output_directory'),
-            'auto_activate': LaunchConfiguration('auto_record')
+            'output_dir': LaunchConfiguration('output_directory')
         }.items()
     )
     
@@ -68,5 +67,5 @@ def generate_launch_description():
         
         # Include launch files
         sync_launch,
-        rosbag_recorder_launch
+        data_recorder_launch
     ])

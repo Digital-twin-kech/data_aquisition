@@ -21,6 +21,8 @@ find_package(diagnostic_updater REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(Boost REQUIRED COMPONENTS system filesystem program_options)
+find_package(cv_bridge REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # Find CUDA and ZED SDK
 find_package(CUDA REQUIRED)
@@ -41,6 +43,8 @@ include_directories(
   ${ZED_INCLUDE_DIRS}
   ${CUDA_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
+  ${PCL_INCLUDE_DIRS}
 )
 
 # Camera components
@@ -133,25 +137,7 @@ ament_target_dependencies(livox_adapter
   std_msgs
   sensor_msgs)
 
-# ROS2 Bag Recorder components
-add_library(recording_lib SHARED
-  src/recording/rosbag_recorder.cpp
-)
-
-ament_target_dependencies(recording_lib
-  rclcpp
-  rclcpp_components
-  rclcpp_lifecycle
-  std_msgs
-  sensor_msgs
-  diagnostic_msgs
-  lifecycle_msgs
-  diagnostic_updater
-)
-
-target_link_libraries(recording_lib
-  ${Boost_LIBRARIES}
-)
+# Recording components removed, using direct file recorder from src/recorder/ instead
 
 # Camera node executable
 add_executable(zed_camera_node
@@ -241,19 +227,25 @@ ament_target_dependencies(sync_node
   message_filters
 )
 
-# ROS2 Bag Recorder node executable
-add_executable(rosbag_recorder_node
-  src/recording/rosbag_recorder_main.cpp
+# ROS2 Bag Recorder node executable removed, using data_recorder_node instead
+
+# Data Recorder node
+add_executable(data_recorder_node
+  src/recorder/main.cpp
+  src/recorder/data_recorder_node.cpp
 )
 
-target_link_libraries(rosbag_recorder_node recording_lib)
-
-ament_target_dependencies(rosbag_recorder_node
+ament_target_dependencies(data_recorder_node
   rclcpp
-  rclcpp_components
-  rclcpp_lifecycle
   std_msgs
   sensor_msgs
+  cv_bridge
+  nav_msgs
+  message_filters
+)
+
+target_link_libraries(data_recorder_node
+  ${OpenCV_LIBRARIES}
 )
 
 # Register components
@@ -262,7 +254,6 @@ rclcpp_components_register_nodes(gnss_lib "sensors::gnss::GnssNode")
 rclcpp_components_register_nodes(lidar_lib "sensors::lidar::LivoxLidarNode")
 rclcpp_components_register_nodes(livox_adapter "sensors::lidar::LivoxAdapterNode")
 rclcpp_components_register_nodes(sync_lib "data_aquisition::sync::SensorSynchronizer")
-rclcpp_components_register_nodes(recording_lib "data_aquisition::recording::RosbagRecorder")
 
 # Install targets
 install(TARGETS
@@ -271,13 +262,12 @@ install(TARGETS
   lidar_lib
   livox_adapter
   sync_lib
-  recording_lib
   zed_camera_node
   gnss_node
   livox_lidar_node
   livox_adapter_node
   sync_node
-  rosbag_recorder_node
+  data_recorder_node
   ARCHIVE DESTINATION lib
   LIBRARY DESTINATION lib
   RUNTIME DESTINATION lib/${PROJECT_NAME}
