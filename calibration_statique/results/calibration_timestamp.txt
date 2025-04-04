@@ -1,0 +1,6 @@
+Calibration performed at: 2025-04-04 19:59:00
+Using session: 20250404_195342
+Camera image: 1743796523462511206
+Camera point cloud: 1743796523529173472.ply
+LiDAR point cloud: 1743796523384584585.ply
+Notes: This calibration is based on fallback values for testing

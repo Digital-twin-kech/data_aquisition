@@ -399,7 +399,17 @@ bool ZedCameraDriver::getRgbImage(sensor_msgs::msg::Image& image) {
       return false;
     }
     
-    // Retrieve the left RGB image
+    // Adjust runtime parameters for better color quality
+    runtime_params_.remove_saturated_areas = true;  // Remove saturated areas for better color
+    runtime_params_.enable_fill_mode = true;        // Fill holes in the depth map
+    
+    // Set color enhancement
+    zed_->setCameraSettings(sl::VIDEO_SETTINGS::BRIGHTNESS, 4);       // Slightly increase brightness
+    zed_->setCameraSettings(sl::VIDEO_SETTINGS::CONTRAST, 4);         // Slightly increase contrast
+    zed_->setCameraSettings(sl::VIDEO_SETTINGS::SATURATION, 5);       // Slightly increase saturation
+    zed_->setCameraSettings(sl::VIDEO_SETTINGS::WHITEBALANCE_AUTO, 1); // Auto white balance
+    
+    // Retrieve the left RGB image with enhanced quality
     sl::Mat zed_image;
     err = zed_->retrieveImage(zed_image, sl::VIEW::LEFT, sl::MEM::CPU);
     if (err != sl::ERROR_CODE::SUCCESS) {
@@ -840,10 +850,10 @@ void ZedCameraDriver::fillImageMsg(sensor_msgs::msg::Image& ros_image, const sl:
       ros_image.encoding = sensor_msgs::image_encodings::MONO8;
       break;
     case sl::MAT_TYPE::U8_C3:
-      ros_image.encoding = sensor_msgs::image_encodings::RGB8;
+      ros_image.encoding = sensor_msgs::image_encodings::BGR8; // Changed from RGB8 to BGR8 for better visualization in RViz
       break;
     case sl::MAT_TYPE::U8_C4:
-      ros_image.encoding = sensor_msgs::image_encodings::RGBA8;
+      ros_image.encoding = sensor_msgs::image_encodings::BGRA8; // Changed from RGBA8 to BGRA8
       break;
     case sl::MAT_TYPE::F32_C1:
       ros_image.encoding = sensor_msgs::image_encodings::TYPE_32FC1;
@@ -856,10 +866,36 @@ void ZedCameraDriver::fillImageMsg(sensor_msgs::msg::Image& ros_image, const sl:
   ros_image.is_bigendian = false;
   ros_image.step = zed_image.getStepBytes();
   
-  // Copy the image data directly from the ZED SDK
+  // Copy the image data and perform color correction if needed
   const size_t data_size = zed_image.getHeight() * zed_image.getStepBytes();
   ros_image.data.resize(data_size);
-  memcpy(ros_image.data.data(), zed_image.getPtr<sl::uchar1>(), data_size);
+  
+  if (zed_image.getDataType() == sl::MAT_TYPE::U8_C3 || zed_image.getDataType() == sl::MAT_TYPE::U8_C4) {
+    // For RGB/RGBA data, we need to swap R and B channels for proper BGR/BGRA visualization
+    unsigned char* src_ptr = zed_image.getPtr<sl::uchar1>();
+    unsigned char* dst_ptr = ros_image.data.data();
+    
+    int channels = (zed_image.getDataType() == sl::MAT_TYPE::U8_C3) ? 3 : 4;
+    
+    for (size_t y = 0; y < ros_image.height; y++) {
+      for (size_t x = 0; x < ros_image.width; x++) {
+        size_t idx = y * zed_image.getStepBytes() + x * channels;
+        
+        // Swap R and B channels for better color representation
+        dst_ptr[idx] = src_ptr[idx + 2];  // B = R
+        dst_ptr[idx + 1] = src_ptr[idx + 1];  // G = G
+        dst_ptr[idx + 2] = src_ptr[idx];  // R = B
+        
+        // Copy alpha if it exists
+        if (channels == 4) {
+          dst_ptr[idx + 3] = src_ptr[idx + 3];
+        }
+      }
+    }
+  } else {
+    // For grayscale or other formats, just copy directly
+    memcpy(ros_image.data.data(), zed_image.getPtr<sl::uchar1>(), data_size);
+  }
 }
 
 }  // namespace camera

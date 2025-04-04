@@ -26,7 +26,7 @@ LivoxConverter::convertToPointCloud2(
   cloud->header.stamp = {};  // Use default timestamp
   
   // Set basic fields for XYZRGB point cloud
-  cloud->fields.resize(6);
+  cloud->fields.resize(4);
   cloud->fields[0].name = "x";
   cloud->fields[0].offset = 0;
   cloud->fields[0].datatype = sensor_msgs::msg::PointField::FLOAT32;
@@ -42,20 +42,11 @@ LivoxConverter::convertToPointCloud2(
   cloud->fields[2].datatype = sensor_msgs::msg::PointField::FLOAT32;
   cloud->fields[2].count = 1;
   
-  cloud->fields[3].name = "r";
+  // CRITICAL: The field name must be "rgb" for PCL/RViz compatibility
+  cloud->fields[3].name = "rgb";
   cloud->fields[3].offset = 12;
-  cloud->fields[3].datatype = sensor_msgs::msg::PointField::UINT8;
+  cloud->fields[3].datatype = sensor_msgs::msg::PointField::UINT32;
   cloud->fields[3].count = 1;
-  
-  cloud->fields[4].name = "g";
-  cloud->fields[4].offset = 13;
-  cloud->fields[4].datatype = sensor_msgs::msg::PointField::UINT8;
-  cloud->fields[4].count = 1;
-  
-  cloud->fields[5].name = "b";
-  cloud->fields[5].offset = 14;
-  cloud->fields[5].datatype = sensor_msgs::msg::PointField::UINT8;
-  cloud->fields[5].count = 1;
   
   // Set point cloud properties
   cloud->point_step = 16;  // Size of each point (including padding)
@@ -83,11 +74,16 @@ LivoxConverter::convertToPointCloud2(
     std::memcpy(&cloud->data[idx + 4], &y, sizeof(float));
     std::memcpy(&cloud->data[idx + 8], &z, sizeof(float));
     
-    // rgb values
-    cloud->data[idx + 12] = 255;  // r
-    cloud->data[idx + 13] = 0;    // g
-    cloud->data[idx + 14] = 0;    // b
-    cloud->data[idx + 15] = 0;    // padding
+    // Create RGB values with proper PCL RGB format
+    uint8_t r = 100;  // Adjust these values for better visualization
+    uint8_t g = 180;
+    uint8_t b = 220;
+    
+    // Create RGB in PCL's expected format (BGR format where B is in the highest bits)
+    uint32_t rgb_val = ((uint32_t)b << 16 | (uint32_t)g << 8 | (uint32_t)r);
+    
+    // Copy RGB value as a single UINT32
+    std::memcpy(&cloud->data[idx + 12], &rgb_val, sizeof(uint32_t));
   }
   
   return cloud;

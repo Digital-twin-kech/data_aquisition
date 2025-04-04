@@ -15,7 +15,7 @@
       # Lidar settings
       broadcast_code: "livox0000000001"
       publish_frequency: 10.0
-      point_cloud_type: 0  # 0=XYZ+Intensity, 1=XYZ+RGB
+      point_cloud_type: 1  # 0=XYZ+Intensity, 1=XYZ+RGB
       
       # QoS settings
       qos_reliability: true

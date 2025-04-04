@@ -24,6 +24,14 @@ find_package(Boost REQUIRED COMPONENTS system filesystem program_options)
 find_package(cv_bridge REQUIRED)
 find_package(OpenCV REQUIRED)
 
+# Find PCL
+find_package(PCL REQUIRED)
+add_definitions(${PCL_DEFINITIONS})
+list(REMOVE_ITEM PCL_LIBRARIES "vtkproj4")
+find_package(pcl_conversions REQUIRED)
+# pcl_ros is not needed for this specific functionality
+# find_package(pcl_ros REQUIRED)
+
 # Find CUDA and ZED SDK
 find_package(CUDA REQUIRED)
 set(ZED_DIR "/usr/local/zed/")
@@ -46,6 +54,9 @@ include_directories(
   ${OpenCV_INCLUDE_DIRS}
   ${PCL_INCLUDE_DIRS}
 )
+
+# Add PCL specific link directories
+link_directories(${PCL_LIBRARY_DIRS})
 
 # Camera components
 add_library(camera_lib SHARED
@@ -242,10 +253,12 @@ ament_target_dependencies(data_recorder_node
   cv_bridge
   nav_msgs
   message_filters
+  pcl_conversions
 )
 
 target_link_libraries(data_recorder_node
   ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES}
 )
 
 # Register components

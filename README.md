@@ -158,7 +158,7 @@ ros2 run data_aquisition gnss_node --ros-args -p gnss.use_rtcm_corrections:=true
 
 ### Point Cloud Visualization
 
-The system includes a dedicated script for visualizing point clouds in RViz2:
+The system includes dedicated scripts for visualizing point clouds in RViz2:
 
 ```bash
 # Setup RViz configuration for point cloud viewing
@@ -166,6 +166,12 @@ The system includes a dedicated script for visualizing point clouds in RViz2:
 
 # Launch visualization with a running camera
 ./scripts/visualize_zed_pointcloud.sh
+
+# Launch visualization with running LiDAR
+./scripts/visualize_livox_pointcloud.sh
+
+# Fix and visualize camera point clouds (all cameras)
+./scripts/fix_camera_pointclouds.sh
 ```
 
 ### Camera Image Visualization
@@ -179,6 +185,14 @@ ros2 run rviz2 rviz2 -d $(ros2 pkg prefix data_aquisition)/share/data_aquisition
 # Using image_view (alternative)
 ros2 run image_view image_view --ros-args -r image:=/ZED_CAMERA_X0/rgb/image_rect_color
 ```
+
+### Point Cloud Color Optimization
+
+The system has been optimized for proper color visualization in RViz:
+
+- Camera point clouds use BGR channel ordering compatible with RViz's RGB8 transformer
+- LiDAR point clouds pack RGB values in a single UINT32 field named "rgb" for PCL compatibility
+- Color enhancements improve image quality with adjusted brightness, contrast, and saturation
 
 ### GNSS Data Visualization
 

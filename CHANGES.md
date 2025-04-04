@@ -11,6 +11,8 @@ The point cloud visualization issues were caused by multiple factors:
 
 4. **Frame ID Configuration**: The RViz configuration was using a fixed frame that didn't match the sensor frames.
 
+5. **Color Encoding Mismatch**: Camera images showed a blue tint due to RGB/BGR channel mismatch, and LiDAR point clouds had incorrect colors due to field format issues.
+
 ## Fixes Implemented
 
 1. **Enhanced run_sensors_node.sh Script**:
@@ -30,6 +32,18 @@ The point cloud visualization issues were caused by multiple factors:
 
 4. **Created Combined Script**:
    - `run_sensors_with_transformers.sh` runs the sensors and visualizes point clouds
+
+5. **Fixed Color Visualization Issues**:
+   - Camera:
+     - Changed image quality from QUALITY to ULTRA for better color reproduction
+     - Improved point cloud resolution from PERFORMANCE to QUALITY
+     - Added color enhancement settings (brightness, contrast, saturation)
+     - Implemented proper RGB to BGR channel swapping for RViz compatibility
+
+   - LiDAR:
+     - Changed point cloud type from intensity-based to RGB-based
+     - Updated field definitions to use a single "rgb" field with UINT32 datatype
+     - Implemented proper RGB packing for PCL/RViz compatibility
 
 ## Usage Instructions
 
@@ -54,6 +68,12 @@ The point cloud visualization issues were caused by multiple factors:
 
 # Visualize raw LiDAR point cloud
 ./scripts/visualize_livox_pointcloud.sh --topic-type raw
+```
+
+### Visualizing Fixed Camera Point Clouds
+```bash
+# Run the specialized script to fix and visualize camera point clouds
+./scripts/fix_camera_pointclouds.sh
 ```
 
 ## Known Limitations

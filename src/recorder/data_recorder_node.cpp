@@ -1,4 +1,8 @@
 #include "data_recorder_node.hpp"
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/io/ply_io.h>
+#include <pcl/point_types.h>
+#include <pcl/point_cloud.h>
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -37,6 +41,11 @@ DataRecorderNode::DataRecorderNode(const std::string &base_output_dir)
     std::filesystem::create_directories(base_path_ + "/gnss_fix");
     std::filesystem::create_directories(base_path_ + "/point_clouds");
     
+    std::filesystem::create_directories(base_path_ + "/ZED_CAMERA_2i_point_clouds");
+    std::filesystem::create_directories(base_path_ + "/ZED_CAMERA_X0_point_clouds");
+    std::filesystem::create_directories(base_path_ + "/ZED_CAMERA_X1_point_clouds");
+    
+
     // Open CSV files for IMU and GNSS topics
     imu_file_2i_.open(session_dir + "/ZED_CAMERA_2i_IMU/data.csv");
     imu_file_X0_.open(session_dir + "/ZED_CAMERA_X0_IMU/data.csv");
@@ -91,6 +100,26 @@ DataRecorderNode::DataRecorderNode(const std::string &base_output_dir)
             this->saveImu(msg, imu_file_X1_);
         });
     
+
+    camera_pc_sub_2i_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/synchronized/ZED_CAMERA_2i/point_cloud/cloud_registered", 10,
+            [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+                this->savePointCloudPLY(msg, "ZED_CAMERA_2i_point_clouds");
+            });
+        
+    camera_pc_sub_X0_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/synchronized/ZED_CAMERA_X0/point_cloud/cloud_registered", 10,
+            [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+                this->savePointCloudPLY(msg, "ZED_CAMERA_X0_point_clouds");
+            });
+        
+    camera_pc_sub_X1_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
+            "/synchronized/ZED_CAMERA_X1/point_cloud/cloud_registered", 10,
+            [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
+                this->savePointCloudPLY(msg, "ZED_CAMERA_X1_point_clouds");
+            });
+        
+
     // GNSS subscription
     gnss_sub_ = this->create_subscription<sensor_msgs::msg::NavSatFix>(
         "/synchronized/gnss/fix", 100,
@@ -102,7 +131,7 @@ DataRecorderNode::DataRecorderNode(const std::string &base_output_dir)
     pointcloud_sub_ = this->create_subscription<sensor_msgs::msg::PointCloud2>(
         "/synchronized/livox/lidar", 10,
         [this](sensor_msgs::msg::PointCloud2::ConstSharedPtr msg) {
-            this->savePointCloudRaw(msg, "point_clouds");
+            this->savePointCloudPLY(msg, "point_clouds");
         });
     
     RCLCPP_INFO(this->get_logger(), "DataRecorderNode initialized. Saving to %s", session_dir.c_str());
@@ -124,6 +153,31 @@ std::string DataRecorderNode::getTimestampStr(const builtin_interfaces::msg::Tim
     std::ostringstream oss;
     oss << stamp.sec << std::setw(9) << std::setfill('0') << stamp.nanosec;
     return oss.str();
+}
+void DataRecorderNode::savePointCloudPLY(const sensor_msgs::msg::PointCloud2::ConstSharedPtr &msg, const std::string &folder) {
+    std::string stamp_str = getTimestampStr(msg->header.stamp);
+    std::string filename = base_path_ + "/" + folder + "/" + stamp_str + ".ply";
+
+    try {
+        // Convert ROS message to PCL cloud
+        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+        pcl::fromROSMsg(*msg, *cloud);
+
+        if (cloud->empty()) {
+            RCLCPP_WARN(this->get_logger(), "Empty point cloud received, skipping: %s", filename.c_str());
+            return;
+        }
+
+        // Save to PLY file
+        if (pcl::io::savePLYFileBinary(filename, *cloud) < 0) {
+            RCLCPP_ERROR(this->get_logger(), "Failed to write point cloud to: %s", filename.c_str());
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Successfully saved point cloud with %zu points to %s", 
+                cloud->size(), filename.c_str());
+        }
+    } catch (const std::exception& e) {
+        RCLCPP_ERROR(this->get_logger(), "Exception saving point cloud: %s", e.what());
+    }
 }
 
 // Save image as PNG file

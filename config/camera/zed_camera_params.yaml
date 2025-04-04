@@ -15,12 +15,12 @@
     # Image quality and resolution
     image:
       resolution: 'HD720'  # Options: VGA, HD720, HD1080, HD2K
-      quality: 'QUALITY'   # Options: PERFORMANCE, QUALITY, ULTRA
+      quality: 'ULTRA'     # Options: PERFORMANCE, QUALITY, ULTRA
       
     # Point cloud settings
     point_cloud:
       enabled: true
-      resolution: 'PERFORMANCE'  # Options: PERFORMANCE, QUALITY, ULTRA
+      resolution: 'QUALITY'  # Options: PERFORMANCE, QUALITY, ULTRA
       max_range: 20.0  # meters
       frame_id: 'camera_link'
       
