@@ -3,10 +3,10 @@
     # Camera settings
     camera:
       model: 'ZED_X'
-      min_fps: 15.0
-      max_fps: 60.0
+      min_fps: 10.0
+      max_fps: 10.0  # Fixed framerate for better synchronization
       reliable_qos: true
-      qos_history_depth: 5
+      qos_history_depth: 50  # Increased buffer size
       pid_p: 0.8
       pid_i: 0.2
       pid_d: 0.05
@@ -14,14 +14,14 @@
       
     # Image quality and resolution
     image:
-      resolution: 'HD720'  # Options: VGA, HD720, HD1080, HD2K
-      quality: 'ULTRA'     # Options: PERFORMANCE, QUALITY, ULTRA
+      resolution: 'HD720'  # Lower resolution for better performance
+      quality: 'QUALITY'   # Balance between quality and performance
       
     # Point cloud settings
     point_cloud:
       enabled: true
-      resolution: 'QUALITY'  # Options: PERFORMANCE, QUALITY, ULTRA
-      max_range: 20.0  # meters
+      resolution: 'PERFORMANCE'  # Use PERFORMANCE for better frame rate
+      max_range: 15.0  # meters - reduced for better performance
       frame_id: 'camera_link'
       
     # Depth settings

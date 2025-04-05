@@ -13,25 +13,25 @@ def generate_launch_description():
     
     time_tolerance_arg = DeclareLaunchArgument(
         'time_tolerance',
-        default_value='0.10',
+        default_value='0.30',
         description='Time tolerance for synchronization in seconds'
     )
     
     cache_size_arg = DeclareLaunchArgument(
         'cache_size',
-        default_value='100',
+        default_value='300',
         description='Cache size for synchronization'
     )
     
     max_delay_arg = DeclareLaunchArgument(
         'max_delay',
-        default_value='0.5',
+        default_value='1.0',
         description='Maximum allowable delay for synchronization in seconds'
     )
     
     pass_through_arg = DeclareLaunchArgument(
         'pass_through',
-        default_value='true',
+        default_value='false',
         description='Enable direct pass-through of messages without waiting for synchronization'
     )
     

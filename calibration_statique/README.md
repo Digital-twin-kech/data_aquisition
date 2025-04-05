@@ -20,27 +20,23 @@ pip install numpy opencv-python open3d
 
 ## Data Collection
 
-For a proper calibration session with the ChArUco board:
+For a proper calibration session with the existing A0-sized ChArUco board:
 
-1. Create a ChArUco board using the included generator tool:
-   ```bash
-   python3 generate_charuco_board.py --output charuco_board.png
-   ```
-
-2. Print the board on a rigid material (preferably non-reflective)
-
-3. Set up the calibration:
-   - Position the ChArUco board so it's visible to both the LiDAR and camera
+1. Set up the calibration:
+   - Position the A0 ChArUco board so it's visible to both the LiDAR and camera
    - Place it approximately 1-3 meters from the sensors
    - Ensure good lighting conditions for camera detection
    - Hold the board steady or mount it on a stable surface
+   - Make sure the board is completely flat (not bent or curved)
 
-4. Record data:
+2. Record data:
    ```bash
    ./scripts/run_sensors_node.sh
    ```
    
-5. Wait for 10-15 seconds to ensure enough frames are captured
+3. Wait for 10-15 seconds to ensure enough frames are captured
+
+4. For best results, capture the ChArUco board from multiple angles by gently moving it to different positions while recording
 
 ## Running Calibration
 
@@ -135,21 +131,20 @@ def transform_point_cloud(points, transform):
     return transformed_points[:, :3]
 ```
 
-## Generate ChArUco Board
+## Pre-generated ChArUco Board
 
-To generate a ChArUco board for calibration:
+The calibration system uses a pre-generated ChArUco board for A0 paper size (841 x 1189 mm) located in the `charuco_target` directory:
 
-```bash
-python3 generate_charuco_board.py --output charuco_board.png --squares_x 5 --squares_y 7 --square_length 30 --marker_length 23 --dpi 300
-```
+- `charuco_board_A0.png`: PNG image of the ChArUco board
+- `charuco_board_A0.pdf`: PDF version for printing
 
-Parameters:
-- `--output`: Output filename (PNG format)
-- `--squares_x`: Number of squares in X direction (default: 5)
-- `--squares_y`: Number of squares in Y direction (default: 7)
-- `--square_length`: Length of each square in mm (default: 30)
-- `--marker_length`: Length of ArUco markers in mm (default: 23)
-- `--dpi`: Print resolution in dots per inch (default: 300)
+The board has the following specifications:
+- 10 squares in X direction
+- 14 squares in Y direction 
+- Square size: 7 cm
+- Marker size: 5.5 cm
+
+If using the pre-generated board, ensure it's printed at 100% scale on A0 paper and mounted on a rigid surface for best results.
 
 ## Troubleshooting
 

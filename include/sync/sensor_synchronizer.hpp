@@ -37,6 +37,46 @@ private:
   double max_delay_;
   bool pass_through_; // Whether to directly forward messages without waiting for synchronization
   
+  // Synchronization statistics
+  struct SyncStats {
+    std::string name;
+    int messages_received{0};
+    int messages_dropped{0};
+    int sync_success_count{0};
+    double max_time_diff{0.0};
+    double total_time_diff{0.0};
+    rclcpp::Time last_message_time;
+    
+    // Keep track of rates
+    std::deque<rclcpp::Time> message_timestamps;
+    
+    void add_message() {
+      messages_received++;
+      message_timestamps.push_back(rclcpp::Clock().now());
+      // Keep only last 100 timestamps for rate calculation
+      if (message_timestamps.size() > 100) {
+        message_timestamps.pop_front();
+      }
+    }
+    
+    double get_rate() const {
+      if (message_timestamps.size() < 2) {
+        return 0.0;
+      }
+      
+      auto duration = message_timestamps.back() - message_timestamps.front();
+      double seconds = duration.seconds();
+      return seconds > 0.0 ? message_timestamps.size() / seconds : 0.0;
+    }
+  };
+  
+  std::unordered_map<std::string, SyncStats> camera_stats_;
+  SyncStats lidar_stats_;
+  SyncStats gnss_stats_;
+  
+  // Timer for reporting statistics
+  rclcpp::TimerBase::SharedPtr stats_timer_;
+  
   // Publishers
   std::unordered_map<std::string, rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr> sync_camera_rgb_pubs_;
   std::unordered_map<std::string, rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr> sync_camera_pc_pubs_;
@@ -73,6 +113,8 @@ private:
   void initializeSynchronizers();
   void initializeDirectSubscribers();
   void loadParameters();
+  void initializeStatistics();
+  void reportSyncStatistics();
   
   // Sync callbacks
   void cameraSyncCallback(const std::string& camera_name,

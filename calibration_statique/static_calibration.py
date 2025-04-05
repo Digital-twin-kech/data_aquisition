@@ -71,6 +71,15 @@ def detect_charuco_board(image):
     # Convert image to grayscale for ArUco detection
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     
+    # Define the ChArUco board parameters for the existing A0 printed target
+    # A0 size is 841 x 1189 mm
+    squares_x = 10
+    squares_y = 14
+    
+    # Physical size of squares and markers in meters from the existing printed A0 board
+    square_length = 0.07  # 7cm squares
+    marker_length = 0.055  # 5.5cm markers
+    
     # We'll use cv2's ArUco detector
     # For OpenCV 4.7+
     try:
@@ -91,8 +100,8 @@ def detect_charuco_board(image):
         debug_img = image.copy()
         cv2.aruco.drawDetectedMarkers(debug_img, corners, ids)
         
-        # Create ChArUco board
-        board = cv2.aruco.CharucoBoard_create(5, 7, 0.04, 0.02, aruco_dict)
+        # Create ChArUco board with A0 size parameters
+        board = cv2.aruco.CharucoBoard_create(squares_x, squares_y, square_length, marker_length, aruco_dict)
         
         # Refine corners
         ret, charuco_corners, charuco_ids = cv2.aruco.interpolateCornersCharuco(
@@ -146,8 +155,8 @@ def detect_charuco_board(image):
             debug_img = image.copy()
             cv2.aruco.drawDetectedMarkers(debug_img, corners, ids)
             
-            # Create ChArUco board
-            board = cv2.aruco.CharucoBoard.create(5, 7, 0.04, 0.02, aruco_dict)
+            # Create ChArUco board with A0 size parameters
+            board = cv2.aruco.CharucoBoard.create(squares_x, squares_y, square_length, marker_length, aruco_dict)
             
             # Create CharucoDetector
             charuco_detector = cv2.aruco.CharucoDetector(board)

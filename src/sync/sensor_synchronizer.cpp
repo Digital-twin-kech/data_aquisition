@@ -22,6 +22,14 @@ SensorSynchronizer::SensorSynchronizer(const rclcpp::NodeOptions & options)
     initializeDirectSubscribers();
   }
   
+  // Initialize statistics
+  initializeStatistics();
+  
+  // Create a timer for periodic statistics reporting
+  stats_timer_ = this->create_wall_timer(
+    std::chrono::seconds(10),
+    std::bind(&SensorSynchronizer::reportSyncStatistics, this));
+  
   RCLCPP_INFO(this->get_logger(), "Sensor Synchronizer initialized");
 }
 
@@ -217,6 +225,15 @@ void SensorSynchronizer::cameraSyncCallback(
   double pc_imu_diff = std::abs((pc_time - imu_time).seconds());
   double max_diff = std::max({img_pc_diff, img_imu_diff, pc_imu_diff});
   
+  // Update synchronization statistics
+  if (camera_stats_.count(camera_name) > 0) {
+    camera_stats_[camera_name].sync_success_count++;
+    camera_stats_[camera_name].total_time_diff += max_diff;
+    camera_stats_[camera_name].max_time_diff = std::max(camera_stats_[camera_name].max_time_diff, max_diff);
+    camera_stats_[camera_name].last_message_time = this->now();
+    camera_stats_[camera_name].add_message();
+  }
+  
   if (max_diff > time_tolerance_) {
     RCLCPP_WARN(this->get_logger(), 
                "Camera %s: Large timestamp difference %.3f s (> tolerance %.3f s)", 
@@ -251,6 +268,19 @@ void SensorSynchronizer::lidarGnssSyncCallback(
   rclcpp::Time lidar_time(lidar_msg->header.stamp);
   rclcpp::Time gnss_time(gnss_msg->header.stamp);
   double time_diff = std::abs((lidar_time - gnss_time).seconds());
+  
+  // Update statistics
+  lidar_stats_.sync_success_count++;
+  lidar_stats_.total_time_diff += time_diff;
+  lidar_stats_.max_time_diff = std::max(lidar_stats_.max_time_diff, time_diff);
+  lidar_stats_.last_message_time = this->now();
+  lidar_stats_.add_message();
+  
+  gnss_stats_.sync_success_count++;
+  gnss_stats_.total_time_diff += time_diff;
+  gnss_stats_.max_time_diff = std::max(gnss_stats_.max_time_diff, time_diff);
+  gnss_stats_.last_message_time = this->now();
+  gnss_stats_.add_message();
   
   if (time_diff > time_tolerance_) {
     RCLCPP_WARN(this->get_logger(), 
@@ -344,6 +374,12 @@ void SensorSynchronizer::cameraRgbCallback(
   if (sync_camera_rgb_pubs_.count(camera_name) > 0) {
     RCLCPP_DEBUG(this->get_logger(), "Direct pass-through for camera %s RGB image", camera_name.c_str());
     sync_camera_rgb_pubs_[camera_name]->publish(*msg);
+    
+    // Update statistics
+    if (camera_stats_.count(camera_name) > 0) {
+      camera_stats_[camera_name].messages_received++;
+      camera_stats_[camera_name].add_message();
+    }
   }
 }
 
@@ -354,6 +390,11 @@ void SensorSynchronizer::cameraPcCallback(
   if (sync_camera_pc_pubs_.count(camera_name) > 0) {
     RCLCPP_DEBUG(this->get_logger(), "Direct pass-through for camera %s point cloud", camera_name.c_str());
     sync_camera_pc_pubs_[camera_name]->publish(*msg);
+    
+    // Update statistics
+    if (camera_stats_.count(camera_name) > 0) {
+      camera_stats_[camera_name].messages_received++;
+    }
   }
 }
 
@@ -364,6 +405,11 @@ void SensorSynchronizer::cameraImuCallback(
   if (sync_camera_imu_pubs_.count(camera_name) > 0) {
     RCLCPP_DEBUG(this->get_logger(), "Direct pass-through for camera %s IMU", camera_name.c_str());
     sync_camera_imu_pubs_[camera_name]->publish(*msg);
+    
+    // Update statistics
+    if (camera_stats_.count(camera_name) > 0) {
+      camera_stats_[camera_name].messages_received++;
+    }
   }
 }
 
@@ -372,6 +418,10 @@ void SensorSynchronizer::lidarCallback(const sensor_msgs::msg::PointCloud2::Cons
   if (sync_lidar_pub_) {
     RCLCPP_DEBUG(this->get_logger(), "Direct pass-through for LiDAR");
     sync_lidar_pub_->publish(*msg);
+    
+    // Update statistics
+    lidar_stats_.messages_received++;
+    lidar_stats_.add_message();
   }
 }
 
@@ -381,6 +431,83 @@ void SensorSynchronizer::gnssCallback(const sensor_msgs::msg::NavSatFix::ConstSh
     RCLCPP_DEBUG(this->get_logger(), "Direct pass-through for GNSS");
     sync_gnss_pub_->publish(*msg);
   }
+  
+  // Update statistics
+  gnss_stats_.messages_received++;
+}
+
+void SensorSynchronizer::initializeStatistics() 
+{
+  RCLCPP_INFO(this->get_logger(), "Initializing synchronization statistics tracking");
+  
+  // Initialize camera statistics
+  for (const auto& camera_name : camera_names_) {
+    camera_stats_[camera_name].name = camera_name;
+    camera_stats_[camera_name].messages_received = 0;
+    camera_stats_[camera_name].messages_dropped = 0;
+    camera_stats_[camera_name].sync_success_count = 0;
+    camera_stats_[camera_name].max_time_diff = 0.0;
+    camera_stats_[camera_name].total_time_diff = 0.0;
+  }
+  
+  // Initialize LiDAR statistics
+  lidar_stats_.name = "LiDAR";
+  lidar_stats_.messages_received = 0;
+  lidar_stats_.messages_dropped = 0;
+  lidar_stats_.sync_success_count = 0;
+  lidar_stats_.max_time_diff = 0.0;
+  lidar_stats_.total_time_diff = 0.0;
+  
+  // Initialize GNSS statistics
+  gnss_stats_.name = "GNSS";
+  gnss_stats_.messages_received = 0;
+  gnss_stats_.messages_dropped = 0;
+  gnss_stats_.sync_success_count = 0;
+  gnss_stats_.max_time_diff = 0.0;
+  gnss_stats_.total_time_diff = 0.0;
+}
+
+void SensorSynchronizer::reportSyncStatistics()
+{
+  RCLCPP_INFO(this->get_logger(), "==== Synchronization Statistics ====");
+  RCLCPP_INFO(this->get_logger(), "Time tolerance: %.3f seconds", time_tolerance_);
+  RCLCPP_INFO(this->get_logger(), "Cache size: %d", cache_size_);
+  RCLCPP_INFO(this->get_logger(), "Sync policy: %s", sync_policy_.c_str());
+  RCLCPP_INFO(this->get_logger(), "Pass-through mode: %s", pass_through_ ? "enabled" : "disabled");
+  RCLCPP_INFO(this->get_logger(), " ");
+  
+  // Report camera stats
+  for (const auto& [name, stats] : camera_stats_) {
+    double avg_diff = stats.sync_success_count > 0 ? stats.total_time_diff / stats.sync_success_count : 0.0;
+    
+    RCLCPP_INFO(this->get_logger(), "Camera %s:", name.c_str());
+    RCLCPP_INFO(this->get_logger(), "  Message rate: %.2f Hz", stats.get_rate());
+    RCLCPP_INFO(this->get_logger(), "  Sync success count: %d", stats.sync_success_count);
+    RCLCPP_INFO(this->get_logger(), "  Avg timestamp diff: %.3f s", avg_diff);
+    RCLCPP_INFO(this->get_logger(), "  Max timestamp diff: %.3f s", stats.max_time_diff);
+  }
+  
+  // Report LiDAR stats
+  double lidar_avg_diff = lidar_stats_.sync_success_count > 0 ? 
+    lidar_stats_.total_time_diff / lidar_stats_.sync_success_count : 0.0;
+  
+  RCLCPP_INFO(this->get_logger(), "LiDAR:");
+  RCLCPP_INFO(this->get_logger(), "  Message rate: %.2f Hz", lidar_stats_.get_rate());
+  RCLCPP_INFO(this->get_logger(), "  Sync success count: %d", lidar_stats_.sync_success_count);
+  RCLCPP_INFO(this->get_logger(), "  Avg timestamp diff: %.3f s", lidar_avg_diff);
+  RCLCPP_INFO(this->get_logger(), "  Max timestamp diff: %.3f s", lidar_stats_.max_time_diff);
+  
+  // Report GNSS stats
+  double gnss_avg_diff = gnss_stats_.sync_success_count > 0 ? 
+    gnss_stats_.total_time_diff / gnss_stats_.sync_success_count : 0.0;
+  
+  RCLCPP_INFO(this->get_logger(), "GNSS:");
+  RCLCPP_INFO(this->get_logger(), "  Message rate: %.2f Hz", gnss_stats_.get_rate());
+  RCLCPP_INFO(this->get_logger(), "  Sync success count: %d", gnss_stats_.sync_success_count);
+  RCLCPP_INFO(this->get_logger(), "  Avg timestamp diff: %.3f s", gnss_avg_diff);
+  RCLCPP_INFO(this->get_logger(), "  Max timestamp diff: %.3f s", gnss_stats_.max_time_diff);
+  
+  RCLCPP_INFO(this->get_logger(), "====================================");
 }
 
 }  // namespace sync

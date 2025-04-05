@@ -159,21 +159,56 @@ void DataRecorderNode::savePointCloudPLY(const sensor_msgs::msg::PointCloud2::Co
     std::string filename = base_path_ + "/" + folder + "/" + stamp_str + ".ply";
 
     try {
-        // Convert ROS message to PCL cloud
-        pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-        pcl::fromROSMsg(*msg, *cloud);
-
-        if (cloud->empty()) {
-            RCLCPP_WARN(this->get_logger(), "Empty point cloud received, skipping: %s", filename.c_str());
-            return;
+        // Check for RGB field in point cloud
+        bool has_rgb = false;
+        for (const auto& field : msg->fields) {
+            if (field.name == "rgb" || field.name == "rgba") {
+                has_rgb = true;
+                break;
+            }
         }
 
-        // Save to PLY file
-        if (pcl::io::savePLYFileBinary(filename, *cloud) < 0) {
-            RCLCPP_ERROR(this->get_logger(), "Failed to write point cloud to: %s", filename.c_str());
-        } else {
-            RCLCPP_INFO(this->get_logger(), "Successfully saved point cloud with %zu points to %s", 
-                cloud->size(), filename.c_str());
+        if (has_rgb) {
+            // Convert ROS message to RGB point cloud if RGB field exists
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr rgb_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+            try {
+                pcl::fromROSMsg(*msg, *rgb_cloud);
+                
+                if (rgb_cloud->empty()) {
+                    RCLCPP_WARN(this->get_logger(), "Empty RGB point cloud received, skipping: %s", filename.c_str());
+                    return;
+                }
+                
+                // Save to PLY file
+                if (pcl::io::savePLYFileBinary(filename, *rgb_cloud) < 0) {
+                    RCLCPP_ERROR(this->get_logger(), "Failed to write RGB point cloud to: %s", filename.c_str());
+                } else {
+                    RCLCPP_INFO(this->get_logger(), "Successfully saved RGB point cloud with %zu points to %s", 
+                        rgb_cloud->size(), filename.c_str());
+                }
+            } catch (const std::exception& e) {
+                RCLCPP_WARN(this->get_logger(), "Failed to convert to RGB cloud, falling back to XYZ: %s", e.what());
+                has_rgb = false; // Fall back to XYZ
+            }
+        }
+        
+        // If we don't have RGB data or RGB conversion failed, use XYZ only
+        if (!has_rgb) {
+            pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+            pcl::fromROSMsg(*msg, *xyz_cloud);
+            
+            if (xyz_cloud->empty()) {
+                RCLCPP_WARN(this->get_logger(), "Empty XYZ point cloud received, skipping: %s", filename.c_str());
+                return;
+            }
+            
+            // Save to PLY file
+            if (pcl::io::savePLYFileBinary(filename, *xyz_cloud) < 0) {
+                RCLCPP_ERROR(this->get_logger(), "Failed to write XYZ point cloud to: %s", filename.c_str());
+            } else {
+                RCLCPP_INFO(this->get_logger(), "Successfully saved XYZ point cloud with %zu points to %s", 
+                    xyz_cloud->size(), filename.c_str());
+            }
         }
     } catch (const std::exception& e) {
         RCLCPP_ERROR(this->get_logger(), "Exception saving point cloud: %s", e.what());
