@@ -16,6 +16,13 @@ def generate_launch_description():
         description='Directory to store recorded data'
     )
     
+    # Log level argument
+    log_level_arg = DeclareLaunchArgument(
+        'log_level',
+        default_value='info',
+        description='Log level for the data recorder node (debug, info, warn, error)'
+    )
+    
     # Create the data recorder node only
     data_recorder_node = Node(
         package='data_aquisition',
@@ -26,12 +33,13 @@ def generate_launch_description():
         }],
         output='screen',
         emulate_tty=True,
-        arguments=['--ros-args', '--log-level', 'debug']  # Set to debug for more verbose output
+        arguments=['--ros-args', '--log-level', LaunchConfiguration('log_level')]
     )
 
     return LaunchDescription([
         # Launch arguments
         output_dir_arg,
+        log_level_arg,
         
         # Nodes
         data_recorder_node
